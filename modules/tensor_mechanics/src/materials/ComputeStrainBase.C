@@ -1,4 +1,4 @@
-/****************************************************************/
+ /****************************************************************/
 /* MOOSE - Multiphysics Object Oriented Simulation Environment  */
 /*                                                              */
 /*          All contents are licensed under LGPL V2.1           */
@@ -23,6 +23,8 @@ validParams<ComputeStrainBase>()
                                "block, i.e. for multiple phases");
   params.addParam<bool>(
       "volumetric_locking_correction", false, "Flag to correct volumetric locking");
+  params.addParam<bool>(
+      "ifOld", false, "Flag to use old value of displacement");
   params.addParam<std::vector<MaterialPropertyName>>(
       "eigenstrain_names", "List of eigenstrains to be applied in this strain calculation");
   params.suppressParameter<bool>("use_displaced_mesh");
@@ -39,6 +41,7 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
     _total_strain(declareProperty<RankTwoTensor>(_base_name + "total_strain")),
     _eigenstrain_names(getParam<std::vector<MaterialPropertyName>>("eigenstrain_names")),
     _eigenstrains(_eigenstrain_names.size()),
+    _ifOld(getParam<bool>("ifOld")),
     _volumetric_locking_correction(getParam<bool>("volumetric_locking_correction")),
     _current_elem_volume(_assembly.elemVolume())
 {
@@ -54,6 +57,25 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
         "The number of variables supplied in 'displacements' must match the mesh dimension.");
 
   // fetch coupled variables and gradients (as stateful properties if necessary)
+
+ if (_ifOld){
+     for (unsigned int i = 0; i < _ndisp; ++i)
+  {
+    _disp[i] = &coupledValueOld("displacements", i);
+    _grad_disp[i] = &coupledGradientOld("displacements", i);
+  }
+
+  // set unused dimensions to zero
+  for (unsigned i = _ndisp; i < 3; ++i)
+  {
+    _disp[i] = &_zero;
+    _grad_disp[i] = &_grad_zero;
+  }
+
+
+
+ }
+ else{
   for (unsigned int i = 0; i < _ndisp; ++i)
   {
     _disp[i] = &coupledValue("displacements", i);
@@ -67,6 +89,7 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
     _grad_disp[i] = &_grad_zero;
   }
 
+ }
   if (_ndisp == 1 && _volumetric_locking_correction)
     mooseError("Volumetric locking correction have to be set to false for 1-D problems.");
 

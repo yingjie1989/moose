@@ -96,6 +96,10 @@ public:
    */
   virtual bool overwriteSlaveJacobian() { return overwriteSlaveResidual(); };
 
+  //virtual bool contactConverged() overide;
+
+  //virtual bool haveAugML() overide;
+
   /**
    * The variable on the Master side of the domain.
    */

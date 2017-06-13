@@ -45,6 +45,7 @@ StressDivergenceTensors::StressDivergenceTensors(const InputParameters & paramet
   : ALEKernel(parameters),
     _base_name(isParamValid("base_name") ? getParam<std::string>("base_name") + "_" : ""),
     _use_finite_deform_jacobian(getParam<bool>("use_finite_deform_jacobian")),
+//    _stress_old(getMaterialPropertyOldByName<RankTwoTensor>(_base_name + "stress")),
     _stress(getMaterialPropertyByName<RankTwoTensor>(_base_name + "stress")),
     _Jacobian_mult(getMaterialPropertyByName<RankFourTensor>(_base_name + "Jacobian_mult")),
     _component(getParam<unsigned int>("component")),

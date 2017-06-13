@@ -7,8 +7,13 @@
 
 // MOOSE includes
 #include "MechanicalContactConstraint.h"
-#include "SystemBase.h"
+#include "FEProblem.h"
+#include "DisplacedProblem.h"
+#include "AuxiliarySystem.h"
 #include "PenetrationLocator.h"
+#include "NearestNodeLocator.h"
+
+#include "SystemBase.h"
 #include "Assembly.h"
 #include "MooseMesh.h"
 #include "FrictionalContactProblem.h"
@@ -54,6 +59,10 @@ validParams<MechanicalContactConstraint>()
                         "Tangential distance to extend edges of contact surfaces");
   params.addParam<Real>(
       "capture_tolerance", 0, "Normal distance from surface within which nodes are captured");
+
+  params.addParam<Real>(
+      "penetration_tolerance", 1e-8, "The tolerance of the distance function");
+
   params.addParam<Real>(
       "normal_smoothing_distance",
       "Distance from edge in parametric coordinates over which to smooth contact normal");
@@ -99,6 +108,7 @@ validParams<MechanicalContactConstraint>()
 
 MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters & parameters)
   : NodeFaceConstraint(parameters),
+    _displaced_problem(parameters.get<FEProblemBase *>("_fe_problem_base")->getDisplacedProblem()),
     _component(getParam<unsigned int>("component")),
     _model(ContactMaster::contactModel(getParam<std::string>("model"))),
     _formulation(ContactMaster::contactFormulation(getParam<std::string>("formulation"))),
@@ -107,6 +117,7 @@ MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters &
     _friction_coefficient(getParam<Real>("friction_coefficient")),
     _tension_release(getParam<Real>("tension_release")),
     _capture_tolerance(getParam<Real>("capture_tolerance")),
+    _penetration_tolerance(getParam<Real>("penetration_tolerance")),
     _stick_lock_iterations(getParam<unsigned int>("stick_lock_iterations")),
     _stick_unlock_factor(getParam<Real>("stick_unlock_factor")),
     _update_contact_set(true),
@@ -186,8 +197,10 @@ MechanicalContactConstraint::timestepSetup()
 {
   if (_component == 0)
   {
-    updateContactSet(true);
-    _update_contact_set = false;
+  // if(_formulation != CF_AUGMENTED_LAGRANGE)
+	updateContactSet(true);
+
+       _update_contact_set = false;
   }
 }
 
@@ -196,10 +209,154 @@ MechanicalContactConstraint::jacobianSetup()
 {
   if (_component == 0)
   {
-    if (_update_contact_set)
+   if (_update_contact_set)
       updateContactSet();
-    _update_contact_set = true;
+      _update_contact_set = true;
   }
+}
+
+void
+MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
+{
+  for (auto & pinfo_pair : _penetration_locator._penetration_info)
+  {
+    const dof_id_type slave_node_num = pinfo_pair.first;
+    PenetrationInfo * pinfo = pinfo_pair.second;
+
+    // Skip this pinfo if there are no DOFs on this node.
+    if (!pinfo || pinfo->_node->n_comp(_sys.number(), _vars[_component]) < 1)
+      continue;
+
+
+
+
+       const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
+
+    const Real distance = pinfo->_normal * (pinfo->_closest_point - _mesh.nodeRef(slave_node_num));
+
+    if (!pinfo->isCaptured() &&
+        MooseUtils::absoluteFuzzyGreaterEqual(distance, 0.0, _capture_tolerance))
+	pinfo->capture();
+
+  else if (_model != CM_GLUED && pinfo->isCaptured() && _tension_release >= 0.0 &&
+           -contact_pressure >= _tension_release && pinfo->_locked_this_step < 2)
+  {
+    pinfo->release();
+    pinfo->_contact_force.zero();
+  }
+
+  if (beginning_of_step)
+     pinfo->_lagrange_multiplier = 0.0;
+
+  if (pinfo->isCaptured())
+         pinfo->_lagrange_multiplier -= getPenalty(*pinfo) * distance;
+
+         //pinfo->_lagrange_multiplier = std::min(0.0,pinfo->_lagrange_multiplier);
+
+      	//_console << "Augmented Lagrangian Multiplier is " << pinfo->_lagrange_multiplier << "\n";
+
+   }
+}
+
+
+bool
+MechanicalContactConstraint::haveAugLM()
+{
+
+  if (_formulation == CF_AUGMENTED_LAGRANGE)
+	return true;
+
+  return false;
+}
+
+bool
+MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & solution)
+{
+
+  Real contactResidual = 0.0;
+
+   for (auto & pinfo_pair : _penetration_locator._penetration_info)
+  {
+    const dof_id_type slave_node_num = pinfo_pair.first;
+    PenetrationInfo * pinfo = pinfo_pair.second;
+
+    // Skip this pinfo if there are no DOFs on this node.
+    if (!pinfo || pinfo->_node->n_comp(_sys.number(), _vars[_component]) < 1)
+      continue;
+
+    //const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
+
+    const Real distance = pinfo->_normal * (pinfo->_closest_point - _mesh.nodeRef(slave_node_num));
+
+  //if (!pinfo->isCaptured() &&
+  //      MooseUtils::absoluteFuzzyGreaterEqual(distance, 0.0, _capture_tolerance))
+  //pinfo->capture();
+
+  //else if (_model != CM_GLUED && pinfo->isCaptured() && _tension_release >= 0.0 &&
+  //         -contact_pressure >= _tension_release && pinfo->_locked_this_step < 2)
+  //{
+  //  pinfo->release();
+  //  pinfo->_contact_force.zero();
+  //}
+
+    if (pinfo->isCaptured()){
+	     if (contactResidual < std::abs(distance) )
+                contactResidual = std::abs(distance);
+
+     }
+
+  }
+
+ /* _displaced_problem->updateMesh(solution, _aux_solution);
+
+  _displaced_problem->updateMesh();
+  GeometricSearchData & displaced_geom_search_data = _displaced_problem->geomSearchData();
+  std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
+      &displaced_geom_search_data._penetration_locators;
+
+  for (pl_iterator plit = penetration_locators->begin(); plit != penetration_locators->end();
+       ++plit)
+  {
+    PenetrationLocator & pen_loc = *plit->second;
+
+      std::vector<dof_id_type> & slave_nodes = pen_loc._nearest_node._slave_nodes;
+
+      for (unsigned int i = 0; i < slave_nodes.size(); i++)
+      {
+
+	 dof_id_type slave_node_num = slave_nodes[i];
+
+        if (pen_loc._penetration_info[slave_node_num])
+        {
+          PenetrationInfo & info = *pen_loc._penetration_info[slave_node_num];
+          const Node * node = info._node;
+
+           if (node->processor_id() == processor_id())
+          {
+            if (info.isCaptured())
+            {
+              const Real distance = info._normal * (info._closest_point - _mesh.nodeRef(node->id()));
+
+    	      contactResidual = std::max(std::abs(distance),contactResidual);
+            }
+	  }
+      }
+    }
+  }*/
+
+  _communicator.max(contactResidual);
+
+  printf("the L norm of penetration is %e\n",contactResidual);
+
+
+  if ( contactResidual < 1e-9 )
+  {
+    _console << "contact enforcement satisfied \n";
+    return true;
+  }
+
+   return false;
+
 }
 
 void
@@ -237,7 +394,7 @@ MechanicalContactConstraint::updateContactSet(bool beginning_of_step)
       pinfo->_starting_elem = pinfo->_elem;
       pinfo->_starting_side_num = pinfo->_side_num;
       pinfo->_starting_closest_point_ref = pinfo->_closest_point_ref;
-      pinfo->_lagrange_multiplier = 0.0;
+    //  pinfo->_lagrange_multiplier = 0.0;
     }
     pinfo->_incremental_slip_prev_iter = pinfo->_incremental_slip;
 
@@ -263,8 +420,10 @@ MechanicalContactConstraint::updateContactSet(bool beginning_of_step)
       pinfo->_contact_force.zero();
     }
 
-    if (_formulation == CF_AUGMENTED_LAGRANGE && pinfo->isCaptured())
-      pinfo->_lagrange_multiplier -= getPenalty(*pinfo) * distance;
+    /*if (_formulation == CF_AUGMENTED_LAGRANGE && pinfo->isCaptured())
+    {  pinfo->_lagrange_multiplier -= getPenalty(*pinfo) * distance;
+      _console << "Augmented Lagrangian Multiplier is " << pinfo->_lagrange_multiplier << "\n";
+    }*/
   }
 }
 

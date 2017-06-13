@@ -3720,7 +3720,6 @@ FEProblemBase::restoreSolutions()
 {
   _nl->restoreSolutions();
   _aux->restoreSolutions();
-
   if (_displaced_problem != NULL)
     _displaced_problem->updateMesh();
 }
@@ -4382,6 +4381,43 @@ FEProblemBase::updateMeshXFEM()
   }
   return updated;
 }
+
+
+bool
+FEProblemBase::updateLagMul()
+{
+
+    if (_displaced_problem != NULL)
+        return _nl->updateLagMul(true);
+
+   return _nl->updateLagMul(false);
+}
+
+void
+FEProblemBase::initLagMul()
+{
+    if (_displaced_problem != NULL){
+        _nl->initLagMul(true);
+	return;
+   }
+   else
+	_nl->initLagMul(false);
+
+	return;
+
+}
+
+bool
+FEProblemBase::haveAugLM()
+{
+
+  if (_displaced_problem != NULL)
+  	return _nl->haveAugLM(true);
+
+   return _nl->haveAugLM(false);
+
+}
+
 
 void
 FEProblemBase::meshChanged()

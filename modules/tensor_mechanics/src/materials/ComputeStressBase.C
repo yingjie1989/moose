@@ -80,6 +80,7 @@ void
 ComputeStressBase::initQpStatefulProperties()
 {
   _stress[_qp].zero();
+
   if (_initial_stress.size() == 3 * 3)
     for (unsigned i = 0; i < 3; ++i)
       for (unsigned j = 0; j < 3; ++j)

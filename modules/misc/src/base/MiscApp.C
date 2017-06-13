@@ -22,6 +22,8 @@
 #include "CoupledDirectionalMeshHeightInterpolation.h"
 #include "CInterfacePosition.h"
 #include "ThermoDiffusion.h"
+#include "ExampleMaterial.h"
+
 
 template <>
 InputParameters
@@ -72,6 +74,8 @@ MiscApp::registerObjects(Factory & factory)
   registerKernel(CoefTimeDerivative);
   registerKernel(GaussContForcing);
   registerKernel(ThermoDiffusion);
+  registerMaterial(ExampleMaterial);
+
 
   registerMaterial(Density);
 

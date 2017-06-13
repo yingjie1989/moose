@@ -34,6 +34,9 @@ protected:
 
   const MaterialProperty<RankTwoTensor> & _mechanical_strain;
   MaterialProperty<RankTwoTensor> & _stress;
+//  MaterialProperty<RankTwoTensor> & _stress_old;
+//  MaterialProperty<RankTwoTensor> & _stress_older;
+
   MaterialProperty<RankTwoTensor> & _elastic_strain;
 
   const MaterialProperty<RankFourTensor> & _elasticity_tensor;

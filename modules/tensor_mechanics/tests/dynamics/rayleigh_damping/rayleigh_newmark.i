@@ -75,7 +75,6 @@
 [Kernels]
   [./DynamicTensorMechanics]
     displacements = 'disp_x disp_y disp_z'
-    zeta = 0.1
   [../]
   [./inertia_x]
     type = InertialForce
@@ -84,7 +83,6 @@
     acceleration = accel_x
     beta = 0.25
     gamma = 0.5
-    eta=0.1
   [../]
   [./inertia_y]
     type = InertialForce
@@ -93,7 +91,6 @@
     acceleration = accel_y
     beta = 0.25
     gamma = 0.5
-    eta=0.1
   [../]
   [./inertia_z]
     type = InertialForce
@@ -102,7 +99,6 @@
     acceleration = accel_z
     beta = 0.25
     gamma = 0.5
-    eta = 0.1
   [../]
 
 []
@@ -157,14 +153,14 @@
     type = RankTwoAux
     rank_two_tensor = stress
     variable = stress_yy
-    index_i = 0
+    index_i = 1
     index_j = 1
   [../]
   [./strain_yy]
     type = RankTwoAux
     rank_two_tensor = total_strain
     variable = strain_yy
-    index_i = 0
+    index_i = 1
     index_j = 1
   [../]
 
@@ -202,16 +198,21 @@
     boundary = bottom
     value=0.0
   [../]
-  [./Pressure]
-    [./Side1]
-      boundary = bottom
-      function = pressure
-      disp_x = disp_x
-      disp_y = disp_y
-      disp_z = disp_z
-      factor = 1
-    [../]
+  [./bottom_y]
+    type = NeumannBC
+    variable = disp_y
+    boundary = bottom
+    value = 1e8
   [../]
+#  [./Pressure]
+#    [./Side1]
+#      boundary = bottom
+#      disp_x = disp_x
+#      disp_y = disp_y
+#      disp_z = disp_z
+#      factor = 1
+#    [../]
+#  [../]
 []
 
 [Materials]
