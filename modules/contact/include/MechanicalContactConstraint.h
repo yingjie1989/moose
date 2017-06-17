@@ -31,6 +31,12 @@ public:
   virtual void timestepSetup();
   virtual void jacobianSetup();
 
+  virtual bool haveAugLM() override;
+
+  virtual bool contactConverged() override;
+
+  virtual void updateLagMul(bool beginning_of_step = false) override;
+
   virtual void updateContactSet(bool beginning_of_step = false);
 
   virtual Real computeQpSlaveValue();
@@ -79,6 +85,8 @@ public:
   void computeContactForce(PenetrationInfo * pinfo);
 
 protected:
+
+  MooseSharedPointer<DisplacedProblem> _displaced_problem;
   Real nodalArea(PenetrationInfo & pinfo);
   Real getPenalty(PenetrationInfo & pinfo);
 
@@ -91,6 +99,7 @@ protected:
   const Real _friction_coefficient;
   const Real _tension_release;
   const Real _capture_tolerance;
+  const Real _penetration_tolerance;
   const unsigned int _stick_lock_iterations;
   const Real _stick_unlock_factor;
   bool _update_contact_set;
@@ -112,6 +121,10 @@ protected:
   const bool _connected_slave_nodes_jacobian;
   /// Whether to include coupling terms with non-displacement variables in the Jacobian
   const bool _non_displacement_vars_jacobian;
+
+  typedef std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *>::iterator
+      pl_iterator;
+
 };
 
 #endif

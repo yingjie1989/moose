@@ -33,6 +33,7 @@
 #include "MultiAppTransfer.h"
 #include "Postprocessor.h"
 
+
 // libMesh includes
 #include "libmesh/enum_quadrature_type.h"
 #include "libmesh/equation_systems.h"
@@ -1084,6 +1085,12 @@ public:
   virtual bool updateMeshXFEM();
 
   virtual void meshChanged() override;
+  
+  virtual bool haveAugLM();
+
+  virtual bool updateLagMul();
+
+  virtual void initLagMul();
 
   /**
    * Register an object that derives from MeshChangedInterface
@@ -1450,6 +1457,10 @@ protected:
 
   /// Pointer to XFEM controller
   std::shared_ptr<XFEMInterface> _xfem;
+
+  /// Pointer to augented Lagrange Multiplier Controller
+
+  //std::shared_ptr<ConstraintInterface> _augML;
 
   // Displaced mesh /////
   MooseMesh * _displaced_mesh;

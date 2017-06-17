@@ -27,6 +27,7 @@
 #include "MechanicalContactConstraint.h"
 #include "SparsityBasedContactConstraint.h"
 #include "FrictionalContactProblem.h"
+#include "ContactAugLagMulProblem.h"
 #include "ReferenceResidualProblem.h"
 #include "NodalArea.h"
 #include "NodalAreaAction.h"
@@ -82,6 +83,7 @@ ContactApp::registerObjects(Factory & factory)
   registerConstraint(MechanicalContactConstraint);
   registerConstraint(SparsityBasedContactConstraint);
   registerProblem(FrictionalContactProblem);
+  registerProblem(ContactAugLagMulProblem);
   registerProblem(ReferenceResidualProblem);
   registerUserObject(NodalArea);
   registerAux(ContactPressureAux);

@@ -1,4 +1,4 @@
-/****************************************************************/
+//****************************************************************/
 /*               DO NOT MODIFY THIS HEADER                      */
 /* MOOSE - Multiphysics Object Oriented Simulation Environment  */
 /*                                                              */
@@ -126,6 +126,11 @@ validParams<Transient>()
       std::numeric_limits<unsigned int>::max(),
       "Maximum number of times to update XFEM crack topology in a step due to evolving cracks");
 
+  params.addParam<unsigned int>(
+      "max_augLM_update",
+      std::numeric_limits<unsigned int>::max(),
+      "Maximum number of times to update Lagrangian Multiplier in a step due to ensure converge");
+
   return params;
 }
 
@@ -146,6 +151,10 @@ Transient::Transient(const InputParameters & parameters)
     _xfem_repeat_step(false),
     _xfem_update_count(0),
     _max_xfem_update(getParam<unsigned int>("max_xfem_update")),
+    _augLM_repeat_step(false),
+    _augLM_update_count(0),
+    _max_augLM_update(getParam<unsigned int>("max_augLM_update")),
+
     _end_time(getParam<Real>("end_time")),
     _dtmin(getParam<Real>("dtmin")),
     _dtmax(getParam<Real>("dtmax")),
@@ -319,7 +328,7 @@ Transient::incrementStepOrReject()
 {
   if (lastSolveConverged())
   {
-    if (_xfem_repeat_step)
+    if (_xfem_repeat_step || _augLM_repeat_step)
     {
       _time = _time_old;
     }
@@ -422,6 +431,10 @@ Transient::solveStep(Real input_dt)
 
   _problem.timestepSetup();
 
+  if (_problem.haveAugLM() && !_augLM_repeat_step)
+    _problem.initLagMul();
+
+
   _problem.execute(EXEC_TIMESTEP_BEGIN);
 
   if (_picard_max_its > 1)
@@ -452,6 +465,13 @@ Transient::solveStep(Real input_dt)
       _xfem_repeat_step = true;
       ++_xfem_update_count;
     }
+
+    else if (_problem.haveAugLM() && _problem.updateLagMul() && (_augLM_update_count < _max_augLM_update))
+    {
+	_console << "Modifying Lagrange Multiplier, repeating step" << std::endl;
+        _augLM_repeat_step = true;
+	++_augLM_update_count;
+    }
     else
     {
       if (_problem.haveXFEM())
@@ -459,6 +479,13 @@ Transient::solveStep(Real input_dt)
         _xfem_repeat_step = false;
         _xfem_update_count = 0;
         _console << "XFEM not modifying mesh, continuing" << std::endl;
+      }
+
+      if (_problem.haveAugLM())
+      {
+	_augLM_repeat_step = false;
+        _augLM_update_count = 0;
+        _console << "Constraint using augmented Lagrange Multiplier has satisfied, not modifying mesh, continuing" << std::endl;
       }
 
       if (_picard_max_its <= 1)
@@ -523,7 +550,7 @@ Transient::endStep(Real input_time)
 
   _last_solve_converged = lastSolveConverged();
 
-  if (_last_solve_converged && !_xfem_repeat_step)
+  if (_last_solve_converged && !_xfem_repeat_step && !_augLM_repeat_step)
   {
     // Compute the Error Indicators and Markers
     _problem.computeIndicators();
@@ -631,7 +658,7 @@ Transient::keepGoing()
   bool keep_going = !_problem.isSolveTerminationRequested();
 
   // Check for stop condition based upon steady-state check flag:
-  if (lastSolveConverged() && !_xfem_repeat_step && _trans_ss_check == true && _time > _ss_tmin)
+  if (lastSolveConverged() && !_xfem_repeat_step && !_augLM_repeat_step && _trans_ss_check == true && _time > _ss_tmin)
   {
     // Check solution difference relative norm against steady-state tolerance
     if (_sln_diff_norm < _ss_check_tol)

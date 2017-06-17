@@ -249,6 +249,10 @@ protected:
   unsigned int _xfem_update_count;
   unsigned int _max_xfem_update;
 
+  bool _augLM_repeat_step;
+  unsigned int _augLM_update_count;
+  unsigned int _max_augLM_update;
+
   Real _end_time;
   Real _dtmin;
   Real _dtmax;

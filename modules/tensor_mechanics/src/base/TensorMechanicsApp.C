@@ -18,6 +18,7 @@
 #include "GeneralizedPlaneStrainAction.h"
 
 #include "StressDivergenceTensors.h"
+#include "StressDivergenceExpTensors.h"
 #include "StressDivergenceTensorsTruss.h"
 #include "CosseratStressDivergenceTensors.h"
 #include "StressDivergenceRZTensors.h"
@@ -33,6 +34,10 @@
 #include "WeakPlaneStress.h"
 #include "PlasticHeatEnergy.h"
 #include "PhaseFieldFractureMechanicsOffDiag.h"
+#include "StressDivergenceExpPFFracTensors.h"
+#include "MassLumpedReaction.h"
+#include "CoefMassReaction.h"
+
 
 #include "LinearElasticTruss.h"
 #include "FiniteStrainPlasticMaterial.h"
@@ -151,6 +156,7 @@
 #include "NewmarkVelAux.h"
 #include "RadialDisplacementCylinderAux.h"
 #include "RadialDisplacementSphereAux.h"
+#include "NewmarkDispAux.h"
 
 #include "CavityPressureAction.h"
 #include "CavityPressurePostprocessor.h"
@@ -223,6 +229,7 @@ void
 TensorMechanicsApp::registerObjects(Factory & factory)
 {
   registerKernel(StressDivergenceTensors);
+  registerKernel(StressDivergenceExpTensors);
   registerKernel(StressDivergenceTensorsTruss);
   registerKernel(CosseratStressDivergenceTensors);
   registerKernel(StressDivergenceRZTensors);
@@ -239,6 +246,10 @@ TensorMechanicsApp::registerObjects(Factory & factory)
   registerKernel(WeakPlaneStress);
   registerKernel(PlasticHeatEnergy);
   registerKernel(PhaseFieldFractureMechanicsOffDiag);
+  registerKernel(StressDivergenceExpPFFracTensors);
+  registerKernel(MassLumpedReaction);
+  registerKernel(CoefMassReaction);
+
 
   registerMaterial(LinearElasticTruss);
   registerMaterial(FiniteStrainPlasticMaterial);
@@ -362,6 +373,8 @@ TensorMechanicsApp::registerObjects(Factory & factory)
   registerAux(NewmarkVelAux);
   registerAux(RadialDisplacementCylinderAux);
   registerAux(RadialDisplacementSphereAux);
+  registerAux(NewmarkDispAux);
+
 
   registerBoundaryCondition(DashpotBC);
   registerBoundaryCondition(PresetVelocity);

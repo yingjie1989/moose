@@ -37,8 +37,10 @@
     master = 20
     slave = 10
     penalty = 1e7
+    system = Constraint
     formulation = augmented_lagrange
-    tangential_tolerance = 1e-3
+    tangential_tolerance = 1e-6
+#    penetration_tolerance = 1e-2
   [../]
 []
 
@@ -132,15 +134,15 @@
 
   line_search = 'none'
 
-  nl_rel_tol = 1e-5
-  nl_abs_tol = 1e-6
+  nl_rel_tol = 1e-6
+  nl_abs_tol = 1e-7
 
   l_tol = 1e-8
 
   l_max_its = 100
   nl_max_its = 20
   dt = 1.0
-  num_steps = 1
+  num_steps = 2
 []
 
 [Outputs]

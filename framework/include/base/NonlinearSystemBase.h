@@ -540,6 +540,10 @@ public:
   unsigned int _current_nl_its;
   bool _compute_initial_residual_before_preset_bcs;
 
+  bool updateLagMul(bool displaced);
+  void initLagMul(bool displaced);
+  bool haveAugLM(bool displaced);
+
 protected:
   /**
    * Compute the residual
@@ -564,6 +568,10 @@ protected:
    */
   void enforceNodalConstraintsResidual(NumericVector<Number> & residual);
   void enforceNodalConstraintsJacobian(SparseMatrix<Number> & jacobian);
+
+  //bool updateLagMul(bool);
+ 
+  //bool haveAugML(bool);
 
   /// solution vector from nonlinear solver
   const NumericVector<Number> * _current_solution;
