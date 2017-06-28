@@ -121,15 +121,6 @@ validParams<Transient>()
   params.addParamNamesToGroup("picard_max_its picard_rel_tol picard_abs_tol", "Picard");
 
   params.addParam<bool>("verbose", false, "Print detailed diagnostics on timestep calculation");
-  params.addParam<unsigned int>(
-      "max_xfem_update",
-      std::numeric_limits<unsigned int>::max(),
-      "Maximum number of times to update XFEM crack topology in a step due to evolving cracks");
-
-  params.addParam<unsigned int>(
-      "max_augLM_update",
-      std::numeric_limits<unsigned int>::max(),
-      "Maximum number of times to update Lagrangian Multiplier in a step due to ensure converge");
 
   return params;
 }
@@ -148,12 +139,6 @@ Transient::Transient(const InputParameters & parameters)
     _first(declareRecoverableData<bool>("first", true)),
     _multiapps_converged(declareRecoverableData<bool>("multiapps_converged", true)),
     _last_solve_converged(declareRecoverableData<bool>("last_solve_converged", true)),
-    _xfem_repeat_step(false),
-    _xfem_update_count(0),
-    _max_xfem_update(getParam<unsigned int>("max_xfem_update")),
-    _augLM_repeat_step(false),
-    _augLM_update_count(0),
-    _max_augLM_update(getParam<unsigned int>("max_augLM_update")),
 
     _end_time(getParam<Real>("end_time")),
     _dtmin(getParam<Real>("dtmin")),
@@ -327,12 +312,6 @@ Transient::incrementStepOrReject()
 {
   if (lastSolveConverged())
   {
-    if (_xfem_repeat_step || _augLM_repeat_step)
-    {
-      _time = _time_old;
-    }
-    else
-    {
 #ifdef LIBMESH_ENABLE_AMR
       if (_problem.adaptivity().isOn())
         _problem.adaptMesh();
@@ -349,7 +328,6 @@ Transient::incrementStepOrReject()
         _problem.advanceMultiApps(EXEC_TIMESTEP_BEGIN);
         _problem.advanceMultiApps(EXEC_TIMESTEP_END);
       }
-    }
   }
   else
   {
@@ -391,6 +369,7 @@ Transient::takeStep(Real input_dt)
   }
 }
 
+
 void
 Transient::solveStep(Real input_dt)
 {
@@ -430,8 +409,8 @@ Transient::solveStep(Real input_dt)
 
   _problem.timestepSetup();
 
-  if (_problem.haveAugLM() && !_augLM_repeat_step)
-    _problem.initLagMul();
+  //if (_problem.haveAugLM() && !_augLM_repeat_step)
+  //  _problem.initLagMul();
 
 
   _problem.execute(EXEC_TIMESTEP_BEGIN);
@@ -452,70 +431,59 @@ Transient::solveStep(Real input_dt)
 
   _time_stepper->step();
 
-  // We know whether or not the nonlinear solver thinks it converged, but we need to see if the
-  // executioner concurs
+  acceptanceCheck(current_dt);
+
+}
+
+void Transient::acceptanceCheck(Real current_dt)
+{
+
   if (lastSolveConverged())
   {
-    _console << COLOR_GREEN << " Solve Converged!" << COLOR_DEFAULT << std::endl;
-
-    if (_problem.haveXFEM() && _problem.updateMeshXFEM() && (_xfem_update_count < _max_xfem_update))
-    {
-      _console << "XFEM modifying mesh, repeating step" << std::endl;
-      _xfem_repeat_step = true;
-      ++_xfem_update_count;
-    }
-
-    else if (_problem.haveAugLM() && _problem.updateLagMul() && (_augLM_update_count < _max_augLM_update))
-    {
-	_console << "Modifying Lagrange Multiplier, repeating step" << std::endl;
-        _augLM_repeat_step = true;
-	++_augLM_update_count;
-    }
-    else
-    {
-      if (_problem.haveXFEM())
-      {
-        _xfem_repeat_step = false;
-        _xfem_update_count = 0;
-        _console << "XFEM not modifying mesh, continuing" << std::endl;
-      }
-
-      if (_problem.haveAugLM())
-      {
-	_augLM_repeat_step = false;
-        _augLM_update_count = 0;
-        _console << "Constraint using augmented Lagrange Multiplier has satisfied, not modifying mesh, continuing" << std::endl;
-      }
-
-      if (_picard_max_its <= 1)
-        _time_stepper->acceptStep();
-
-      _sln_diff_norm = _problem.relativeSolutionDifferenceNorm();
-      _solution_change_norm = _sln_diff_norm / _dt;
-
-      _problem.onTimestepEnd();
-      _problem.execute(EXEC_TIMESTEP_END);
-
-      _problem.execTransfers(EXEC_TIMESTEP_END);
-      _multiapps_converged = _problem.execMultiApps(EXEC_TIMESTEP_END, _picard_max_its == 1);
-
-      if (!_multiapps_converged)
-        return;
-    }
-  }
-  else
+    acceptStep();
+    convergePostSolve(current_dt);
+  }else
   {
-    _console << COLOR_RED << " Solve Did NOT Converge!" << COLOR_DEFAULT << std::endl;
-
-    // Perform the output of the current, failed time step (this only occurs if desired)
-    _problem.outputStep(EXEC_FAILED);
+    rejectStep();
+    divergePostSolve(current_dt);
   }
 
+}
+
+void Transient::rejectStep(){
+  _console << COLOR_RED << " Solve Did NOT Converge!" << COLOR_DEFAULT << std::endl;
+  // Perform the output of the current, failed time step (this only occurs if desired)
+  _problem.outputStep(EXEC_FAILED);
+}
+
+
+void Transient::acceptStep()
+{
+
+  if (_picard_max_its <= 1)
+    _time_stepper->acceptStep();
+
+  _sln_diff_norm = _problem.relativeSolutionDifferenceNorm();
+  _solution_change_norm = _sln_diff_norm / _dt;
+
+  _problem.onTimestepEnd();
+  _problem.execute(EXEC_TIMESTEP_END);
+
+  _problem.execTransfers(EXEC_TIMESTEP_END);
+  _multiapps_converged = _problem.execMultiApps(EXEC_TIMESTEP_END, _picard_max_its == 1);
+
+  if (!_multiapps_converged)
+    return;
+}
+
+
+void Transient::convergePostSolve(Real current_dt)
+{
   postSolve();
   _time_stepper->postSolve();
 
-  if (_picard_max_its > 1 && lastSolveConverged())
-  {
+  if (_picard_max_its > 1){
+
     _picard_timestep_end_norm = _problem.computeResidualL2Norm();
 
     _console << "Picard Norm after TIMESTEP_END MultiApps: " << _picard_timestep_end_norm << '\n';
@@ -535,7 +503,23 @@ Transient::solveStep(Real input_dt)
 
   _dt = current_dt; // _dt might be smaller than this at this point for multistep methods
   _time = _time_old;
+
 }
+
+void
+Transient::divergePostSolve(Real current_dt)
+{
+    // We know whether or not the nonlinear solver thinks it converged, but we need to see if the
+  // executioner concurs
+  postSolve();
+  _time_stepper->postSolve();
+  _dt = current_dt; // _dt might be smaller than this at this point for multistep methods
+  _time = _time_old;
+
+}
+
+
+
 
 void
 Transient::endStep(Real input_time)
@@ -549,7 +533,7 @@ Transient::endStep(Real input_time)
 
   _last_solve_converged = lastSolveConverged();
 
-  if (_last_solve_converged && !_xfem_repeat_step && !_augLM_repeat_step)
+  if (_last_solve_converged)
   {
     // Compute the Error Indicators and Markers
     _problem.computeIndicators();
@@ -657,7 +641,7 @@ Transient::keepGoing()
   bool keep_going = !_problem.isSolveTerminationRequested();
 
   // Check for stop condition based upon steady-state check flag:
-  if (lastSolveConverged() && !_xfem_repeat_step && !_augLM_repeat_step && _trans_ss_check == true && _time > _ss_tmin)
+  if (lastSolveConverged() && _trans_ss_check == true && _time > _ss_tmin)
   {
     // Check solution difference relative norm against steady-state tolerance
     if (_sln_diff_norm < _ss_check_tol)
@@ -675,6 +659,13 @@ Transient::keepGoing()
     }
   }
 
+  return stopCondition(keep_going);
+}
+
+
+bool
+Transient::stopCondition(bool keep_going)
+{
   // Check for stop condition based upon number of simulation steps and/or solution end time:
   if (static_cast<unsigned int>(_t_step) > _num_steps)
     keep_going = false;
