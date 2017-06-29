@@ -124,7 +124,7 @@
 []
 
 [Executioner]
-  type = Transient
+  type = NestedTransient
   solve_type = 'PJFNK'
 
   #petsc_options_iname = '-pc_type -pc_hypre_type -snes_type -snes_ls -snes_linesearch_type -ksp_gmres_restart'

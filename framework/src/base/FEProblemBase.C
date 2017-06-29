@@ -4410,6 +4410,7 @@ FEProblemBase::initLagMul()
 bool
 FEProblemBase::haveAugLM()
 {
+  //return false;
 
   if (_displaced_problem != NULL)
   	return _nl->haveAugLM(true);

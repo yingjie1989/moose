@@ -68,6 +68,15 @@ public:
    * Transient loop will continue as long as this keeps returning true.
    */
   virtual bool keepGoing();
+  virtual bool stopCondition(bool keep_going);
+
+  virtual void acceptanceCheck(Real current_dt);
+
+  virtual void rejectStep();
+  virtual void acceptStep();
+
+  virtual void convergePostSolve(Real current_dt);
+  virtual void divergePostSolve(Real current_dt);
 
   /**
    * Whether or not the last solve converged.
@@ -211,6 +220,7 @@ protected:
    */
   virtual void solveStep(Real input_dt = -1.0);
 
+
   /// Here for backward compatibility
   FEProblemBase & _problem;
 
@@ -240,13 +250,13 @@ protected:
   bool & _last_solve_converged;
 
   /// Whether step should be repeated due to xfem modifying the mesh
-  bool _xfem_repeat_step;
+  /*bool _xfem_repeat_step;
   unsigned int _xfem_update_count;
   unsigned int _max_xfem_update;
 
   bool _augLM_repeat_step;
   unsigned int _augLM_update_count;
-  unsigned int _max_augLM_update;
+  unsigned int _max_augLM_update;*/
 
   Real _end_time;
   Real _dtmin;

@@ -17,6 +17,7 @@
 #include "Assembly.h"
 #include "MooseMesh.h"
 #include "FrictionalContactProblem.h"
+#include "ContactAugLagMulProblem.h"
 #include "Executioner.h"
 #include "AddVariableAction.h"
 

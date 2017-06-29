@@ -146,6 +146,7 @@
 // executioners
 #include "Steady.h"
 #include "Transient.h"
+#include "NestedTransient.h"
 #include "InversePowerMethod.h"
 #include "NonlinearEigen.h"
 
@@ -589,6 +590,7 @@ registerObjects(Factory & factory)
   // executioners
   registerExecutioner(Steady);
   registerExecutioner(Transient);
+  registerExecutioner(NestedTransient);
   registerExecutioner(InversePowerMethod);
   registerExecutioner(NonlinearEigen);
 
