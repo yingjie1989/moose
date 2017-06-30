@@ -15,6 +15,9 @@
 #include "ContactPenetrationVarAction.h"
 #include "ContactPressureAux.h"
 #include "ContactPressureAuxAction.h"
+#include "ContactTractionAux.h"
+#include "ContactTractionAuxAction.h"
+#include "ContactTractionVarAction.h"
 #include "ContactPressureVarAction.h"
 #include "NodalAreaAction.h"
 #include "SlaveConstraint.h"
@@ -84,6 +87,7 @@ ContactApp::registerObjects(Factory & factory)
   registerProblem(ReferenceResidualProblem);
   registerUserObject(NodalArea);
   registerAux(ContactPressureAux);
+  registerAux(ContactTractionAux);
   registerDamper(ContactSlipDamper);
   registerSplit(ContactSplit);
 }
@@ -103,7 +107,10 @@ ContactApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
   registerSyntax("ContactPenetrationVarAction", "Contact/*");
 
   registerSyntax("ContactPressureAuxAction", "Contact/*");
+  registerSyntax("ContactTractionAuxAction", "Contact/*");
   registerSyntax("ContactPressureVarAction", "Contact/*");
+  registerSyntax("ContactTractionVarAction", "Contact/*");
+
 
   registerSyntax("NodalAreaAction", "Contact/*");
   registerSyntax("NodalAreaVarAction", "Contact/*");
@@ -121,6 +128,9 @@ ContactApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
 
   registerAction(ContactPressureAuxAction, "add_aux_kernel");
   registerAction(ContactPressureVarAction, "add_aux_variable");
+
+  registerAction(ContactTractionAuxAction, "add_aux_kernel");
+  registerAction(ContactTractionVarAction, "add_aux_variable");
 
   registerAction(NodalAreaAction, "add_user_object");
   registerAction(NodalAreaVarAction, "add_aux_variable");
