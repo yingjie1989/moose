@@ -611,145 +611,6 @@ FrictionalContactProblem::calculateSlip(const NumericVector<Number> & ghosted_so
   return updatedSolution;
 }
 
-bool
-FrictionalContactProblem::calculateDisInc(const NumericVector<Number> & ghosted_solution,
-                                        std::vector<SlipData> * iterative_slip)
-{
-  NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
-  unsigned int dim = nonlinear_sys.subproblem().mesh().dimension();
-
-  bool updatedSolution = false;
-  _slip_residual = 0.0;
-
-  NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
-  unsigned int dim = nonlinear_sys.subproblem().mesh().dimension();
-
-  _displaced_problem->updateMesh(ghosted_solution, *_aux->currentSolution());
-
-  VariableValue & disp_x_var = getVariableValue(_disp_x)
-  VariableValue & disp_x_var_old = getVariableValue(_disp_x)
-
-
-  VariableValue & disp_y_var = getVariableValue(_disp_y)
-  if (dim == 3){
-    VariableValue & disp_x_var = getVariableValue(_disp_x)
-
-  }
-
-  if (getDisplacedProblem() && _interaction_params.size() > 0)
-  {
-    computeResidual(ghosted_solution, getNonlinearSystemBase().RHS());
-
-    _num_contact_nodes = 0;
-    _num_slipping = 0;
-    _num_slipped_too_far = 0;
-
-    GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-    std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-        &displaced_geom_search_data._penetration_locators;
-
-    AuxiliarySystem & aux_sys = getAuxiliarySystem();
-    const NumericVector<Number> & aux_solution = *aux_sys.currentSolution();
-
-    for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end();
-         ++plit)
-    {
-      PenetrationLocator & pen_loc = *plit->second;
-
-      bool frictional_contact_this_interaction = false;
-
-      std::map<std::pair<int, int>, InteractionParams>::iterator ipit;
-      std::pair<int, int> ms_pair(pen_loc._master_boundary, pen_loc._slave_boundary);
-      ipit = _interaction_params.find(ms_pair);
-      if (ipit != _interaction_params.end())
-        frictional_contact_this_interaction = true;
-
-      if (frictional_contact_this_interaction)
-      {
-
-        InteractionParams & interaction_params = ipit->second;
-        Real slip_factor = interaction_params._slip_factor;
-        Real slip_too_far_factor = interaction_params._slip_too_far_factor;
-        Real friction_coefficient = interaction_params._friction_coefficient;
-
-        std::vector<dof_id_type> & slave_nodes = pen_loc._nearest_node._slave_nodes;
-
-        for (unsigned int i = 0; i < slave_nodes.size(); i++)
-        {
-          dof_id_type slave_node_num = slave_nodes[i];
-
-          if (pen_loc._penetration_info[slave_node_num])
-          {
-            PenetrationInfo & info = *pen_loc._penetration_info[slave_node_num];
-            const Node * node = info._node;
-
-            if (node->processor_id() == processor_id())
-            {
-
-              if (info.isCaptured())
-              {
-                _num_contact_nodes++;
-                RealVectorValue res_vec;
-                RealVectorValue stiff_vec;
-                RealVectorValue slip_inc_vec;
-
-                RealVectorValue slip_iterative(0.0, 0.0, 0.0);
-                Real interaction_slip_residual = 0.0;
-                //  _console << "inc  slip: " << slip_inc_vec << std::endl;
-                //  _console << "info slip: " << info._incremental_slip << std::endl;
-                //  ContactState state = calculateInteractionSlip(slip_iterative,
-                //  interaction_slip_residual, info._normal, res_vec, info._incremental_slip,
-                //  stiff_vec, friction_coefficient, slip_factor, slip_too_far_factor, dim);
-                ContactState state = calculateInteractionSlip(slip_iterative,
-                                                              interaction_slip_residual,
-                                                              info._normal,
-                                                              res_vec,
-                                                              slip_inc_vec,
-                                                              stiff_vec,
-                                                              friction_coefficient,
-                                                              slip_factor,
-                                                              slip_too_far_factor,
-                                                              dim);
-                // _console << "iter slip: " << slip_iterative << std::endl;
-                _slip_residual += interaction_slip_residual * interaction_slip_residual;
-
-                if (state == SLIPPING || state == SLIPPED_TOO_FAR)
-                {
-                  _num_slipping++;
-                  if (state == SLIPPED_TOO_FAR)
-                    _num_slipped_too_far++;
-                  for (unsigned int i = 0; i < dim; ++i)
-                  {
-                    SlipData sd(node, i, slip_iterative(i));
-                    if (iterative_slip)
-                      iterative_slip->push_back(sd);
-                    _it_slip_norm += slip_iterative(i) * slip_iterative(i);
-                    _inc_slip_norm += (slip_inc_vec(i) + slip_iterative(i)) *
-                                      (slip_inc_vec(i) + slip_iterative(i));
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    _communicator.sum(_num_contact_nodes);
-    _communicator.sum(_num_slipping);
-    _communicator.sum(_num_slipped_too_far);
-    _communicator.sum(_slip_residual);
-    _slip_residual = std::sqrt(_slip_residual);
-    _communicator.sum(_it_slip_norm);
-    _it_slip_norm = std::sqrt(_it_slip_norm);
-    _communicator.sum(_inc_slip_norm);
-    _inc_slip_norm = std::sqrt(_inc_slip_norm);
-    if (_num_slipping > 0)
-      updatedSolution = true;
-  }
-
-  return updatedSolution;
-}
 
 bool
 FrictionalContactProblem::calculatePenetration(const NumericVector<Number> & ghosted_solution,
@@ -854,7 +715,7 @@ FrictionalContactProblem::calculateInteractionSlip(RealVectorValue & slip,
   ContactState state = STICKING;
 
   RealVectorValue normal_residual = normal * (normal * residual);
-  Real normal_force = normal_residual.norm();
+  //Real normal_force = normal_residual.norm();
 
   // _console << "normal=" << info._normal << std::endl;
   // _console << "normal_force=" << normal_force << std::endl;
@@ -864,6 +725,8 @@ FrictionalContactProblem::calculateInteractionSlip(RealVectorValue & slip,
   RealVectorValue tangential_force =
       normal_residual - residual; // swap sign to make the code more manageable
   Real tangential_force_magnitude = tangential_force.norm();
+
+  Real normal_force = lagrangin_multiplier + normal_residual.norm();
 
   Real capacity = normal_force * friction_coefficient;
   if (capacity < 0.0)
@@ -875,7 +738,7 @@ FrictionalContactProblem::calculateInteractionSlip(RealVectorValue & slip,
   slip(1) = 0.0;
   slip(2) = 0.0;
 
-  if (slip_inc > 0)
+  if (slip_inc > _constat_slip_tol2)
   {
     state = SLIPPING;
     Real slip_dot_tang_force = incremental_slip * tangential_force / slip_inc;
@@ -1100,14 +963,18 @@ FrictionalContactProblem::checkNonlinearConvergence(std::string & msg,
         const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
 
 
-        bool _augLM_repeat_step;
+        bool _augLM_repeat_step = false;
         bool _pene_residual = calculatePenetration();
-        bool _disp_inc_residual = calculateDispInc();
+        //bool _disp_inc_residual = calculateDispInc();
 
-        if ( calculatePenetration() || calculateDispInc() )
+
+
+        if ( calculatePenetration() )
             _augLM_repeat_step = true;
             else
             _augLM_repeat_step = false;
+
+           calculateSlip(*ghosted_solution, nullptr);
 
 
       if (_augLM_repeat_step || (_slip_residual > _target_contact_residual &&
@@ -1124,7 +991,7 @@ FrictionalContactProblem::checkNonlinearConvergence(std::string & msg,
 
         nonlinear_sys.updateLagMulNormal();
 
-         calculateSlip(*ghosted_solution, nullptr); // Just to calculate slip residual
+      // Just to calculate slip residual
 
        // force it to keep iterating
           nonlinear_sys.updateLagMulTauInc();

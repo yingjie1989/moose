@@ -24,6 +24,7 @@ validParams<PresetAcceleration>()
 PresetAcceleration::PresetAcceleration(const InputParameters & parameters)
   : PresetNodalBC(parameters),
     _u_old(valueOld()),
+    _u_older(valueOlder()),
     _scale_factor(parameters.get<Real>("scale_factor")),
     _function(getFunction("function")),
     _vel_old(coupledValueOld("velocity")),
@@ -40,4 +41,7 @@ PresetAcceleration::computeQpValue()
   // Integrate acceleration using Newmark time integration to get displacement
   return _u_old[_qp] + _dt * _vel_old[_qp] +
          ((0.5 - _beta) * _accel_old[_qp] + _beta * accel) * _dt * _dt;
+
+
+//  return accel * _dt * _dt + 2 * _u_old[_qp] - _u_older[_qp];
 }

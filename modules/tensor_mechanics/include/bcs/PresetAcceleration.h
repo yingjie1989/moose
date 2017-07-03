@@ -24,6 +24,7 @@ protected:
   virtual Real computeQpValue();
 
   const VariableValue & _u_old;
+  const VariableValue & _u_older;
   const Real _scale_factor;
   Function & _function;
   const VariableValue & _vel_old;
