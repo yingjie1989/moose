@@ -259,7 +259,7 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
             fnorm, abstol * _contact_lagmul_tol_factor, rtol * _contact_lagmul_tol_factor, ref_resid))))
   {
     _console << "Augmentd Lagrangian Multiplier iteration " << _num_lagmul_iterations << " ";
-    if (_num_iterations < _max_iters)
+    if (_num_lagmul_iterations < _max_lagmul_iters)
     { // do a slip update if there is another iteration
 
         NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();

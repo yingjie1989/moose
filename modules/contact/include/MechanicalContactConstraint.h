@@ -28,8 +28,8 @@ public:
   MechanicalContactConstraint(const InputParameters & parameters);
   virtual ~MechanicalContactConstraint() {}
 
-  virtual void timestepSetup();
-  virtual void jacobianSetup();
+  virtual void timestepSetup() override;
+  virtual void jacobianSetup() override;
 
   virtual bool haveAugLM() override;
 
@@ -39,36 +39,36 @@ public:
 
   virtual void updateContactSet(bool beginning_of_step = false);
 
-  virtual Real computeQpSlaveValue();
+  virtual Real computeQpSlaveValue() override;
 
-  virtual Real computeQpResidual(Moose::ConstraintType type);
+  virtual Real computeQpResidual(Moose::ConstraintType type) override;
 
   /**
    * Computes the jacobian for the current element.
    */
-  virtual void computeJacobian();
+  virtual void computeJacobian() override;
 
   /**
    * Compute off-diagonal Jacobian entries
    * @param jvar The index of the coupled variable
    */
-  virtual void computeOffDiagJacobian(unsigned int jvar);
+  virtual void computeOffDiagJacobian(unsigned int jvar) override;
 
-  virtual Real computeQpJacobian(Moose::ConstraintJacobianType type);
+  virtual Real computeQpJacobian(Moose::ConstraintJacobianType type) override;
 
   /**
    * Compute off-diagonal Jacobian entries
    * @param type The type of coupling
    * @param jvar The index of the coupled variable
    */
-  virtual Real computeQpOffDiagJacobian(Moose::ConstraintJacobianType type, unsigned int jvar);
+  virtual Real computeQpOffDiagJacobian(Moose::ConstraintJacobianType type, unsigned int jvar) override;
 
   /**
    * Get the dof indices of the nodes connected to the slave node for a specific variable
    * @param var_num The number of the variable for which dof indices are gathered
    * @return bool indicating whether the coupled variable is one of the displacement variables
    */
-  virtual void getConnectedDofIndices(unsigned int var_num);
+  virtual void getConnectedDofIndices(unsigned int var_num) override;
 
   /**
    * Determine whether the coupled variable is one of the displacement variables,
@@ -96,6 +96,7 @@ protected:
   const bool _normalize_penalty;
 
   const Real _penalty;
+  const Real _penalty_slip;
   const Real _friction_coefficient;
   const Real _tension_release;
   const Real _capture_tolerance;

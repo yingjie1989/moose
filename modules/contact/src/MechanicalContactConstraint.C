@@ -55,6 +55,10 @@ validParams<MechanicalContactConstraint>()
       "penalty",
       1e8,
       "The penalty to apply.  This can vary depending on the stiffness of your materials");
+  params.addParam<Real>(
+          "penalty_slip",
+          1e8,
+          "The penalty to apply on sliping direction.  This can vary depending on the stiffness of your materials");
   params.addParam<Real>("friction_coefficient", 0, "The friction coefficient");
   params.addParam<Real>("tangential_tolerance",
                         "Tangential distance to extend edges of contact surfaces");
@@ -254,11 +258,11 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
               pinfo->_lagrange_multiplier -= getPenalty(*pinfo,_penalty) * distance;
          if (_model == CM_COULOMB){
 
-           distance_vec = pinfo->_incremental_slip +
-                          (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
+           RealVectorValue distance_vec = (pinfo->_normal * (_mesh.nodeRef(slave_node_num) - pinfo->_closest_point)) *
                               pinfo->_normal;
 
-           pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
+           Real penalty = getPenalty(*pinfo,_penalty);
+           RealVectorValue pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
 
            pinfo->_lagrange_multiplier += penalty * distance_vec * pinfo->_normal;
            // Frictional capacity
@@ -272,6 +276,7 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
                pinfo->_incremental_slip -
                (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
 
+           Real penalty_slip = getPenalty(*pinfo,_penalty_slip);
 
            RealVectorValue inc_pen_force_tangential = pinfo->_lagrange_multiplier_slip + penalty_slip * tangential_inc_slip;
 
@@ -285,9 +290,9 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
            const Real tan_mag(contact_force_tangential.norm());
 
            if (tan_mag > capacity)
-             pinfo->_lamrangian_multiplier_slip = - tau_old + capacity * contact_force_tangential / tan_mag;
+             pinfo->_lagrange_multiplier_slip = - tau_old + capacity * contact_force_tangential / tan_mag;
              else
-             pinfo->_lamrangian_multiplier_slip += _penalty_slip * tangential_inc_slip;
+             pinfo->_lagrange_multiplier_slip += penalty_slip * tangential_inc_slip;
          }
   }
 
@@ -645,8 +650,7 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
 
         case CF_AUGMENTED_LAGRANGE:
         {
-          distance_vec = pinfo->_incremental_slip +
-                         (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
+          distance_vec = (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
                              pinfo->_normal;
 
           pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
@@ -881,7 +885,7 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
 
             case CF_AUGMENTED_LAGRANGE:
             {
-              Real norml_comp = _phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+              Real normal_comp = _phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
 
               Real tang_comp = 0.0;
 
@@ -1005,7 +1009,7 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
             case CF_PENALTY:
             case CF_AUGMENTED_LAGRANGE:
             {
-              Real norml_comp = -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+              Real normal_comp = -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
 
               Real tang_comp = 0.0;
 
@@ -1124,7 +1128,7 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
             case CF_PENALTY:
             case CF_AUGMENTED_LAGRANGE:
             {
-                Real norml_comp = -_phi_slave[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+                Real normal_comp = -_phi_slave[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
 
                 Real tang_comp = 0.0;
 
@@ -1221,7 +1225,7 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
                                             curr_master_node->dof_number(0, _vars[_component], 0));
                 }
                 return -pinfo->_normal(_component) * (pinfo->_normal * jac_vec) +
-                       (_phi_master[_j][_qp] * penalty * _master_slave[_i][_qp]) *
+                       (_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp]) *
                            pinfo->_normal(_component) * pinfo->_normal(_component);
               }
               else
@@ -1235,10 +1239,11 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
             }
 
             case CF_PENALTY:
+            case CF_TANGENTIAL_PENALTY:
 
             case CF_AUGMENTED_LAGRANGE:
             {
-              Real norml_comp = _phi_master[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+              Real normal_comp = _phi_master[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
 
               Real tang_comp = 0.0;
 
@@ -1252,7 +1257,9 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
               return normal_comp + tang_comp;
             }
 
-            case CF_TANGENTIAL_PENALTY:
+            default:
+              mooseError("Invalid contact formulation");
+
           }
 
 
@@ -1622,7 +1629,7 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
                 Real tan_component_in_coupled_var_dir = tan_slip_dir(coupled_component);
                 return _phi_master[_j][_qp] * penalty * _test_master[_i][_qp] *
                          pinfo->_normal(_component) * normal_component_in_coupled_var_dir
-                       _phi_master[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
+                       +_phi_master[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
                           tan_slip_dir(_component) * tan_component_in_coupled_var_dir;
           }
           else
