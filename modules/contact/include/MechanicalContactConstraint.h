@@ -88,7 +88,7 @@ protected:
 
   MooseSharedPointer<DisplacedProblem> _displaced_problem;
   Real nodalArea(PenetrationInfo & pinfo);
-  Real getPenalty(PenetrationInfo & pinfo);
+  Real getPenalty(PenetrationInfo & pinfo, Real penalty_param);
 
   const unsigned int _component;
   ContactModel _model;

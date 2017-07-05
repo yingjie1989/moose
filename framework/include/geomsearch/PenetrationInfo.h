@@ -103,6 +103,8 @@ public:
   RealVectorValue _contact_force;
   RealVectorValue _contact_force_old;
   Real _lagrange_multiplier;
+  RealVectorValue _lagrange_multiplier_slip;
+  
   unsigned int _locked_this_step;
   unsigned int _stick_locked_this_step;
   MECH_STATUS_ENUM _mech_status;

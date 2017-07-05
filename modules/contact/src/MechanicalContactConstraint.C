@@ -115,6 +115,7 @@ MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters &
     _formulation(ContactMaster::contactFormulation(getParam<std::string>("formulation"))),
     _normalize_penalty(getParam<bool>("normalize_penalty")),
     _penalty(getParam<Real>("penalty")),
+    _penalty_slip(getParam<Real>("penalty_slip")),
     _friction_coefficient(getParam<Real>("friction_coefficient")),
     _tension_release(getParam<Real>("tension_release")),
     _capture_tolerance(getParam<Real>("capture_tolerance")),
@@ -230,7 +231,6 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 
 
 
-
        const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
 
     const Real distance = pinfo->_normal * (pinfo->_closest_point - _mesh.nodeRef(slave_node_num));
@@ -249,8 +249,47 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
   if (beginning_of_step)
      pinfo->_lagrange_multiplier = 0.0;
 
-  if (pinfo->isCaptured())
-         pinfo->_lagrange_multiplier -= getPenalty(*pinfo) * distance;
+  if (pinfo->isCaptured()){
+         if (_model == CM_FRICTIONLESS)
+              pinfo->_lagrange_multiplier -= getPenalty(*pinfo,_penalty) * distance;
+         if (_model == CM_COULOMB){
+
+           distance_vec = pinfo->_incremental_slip +
+                          (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
+                              pinfo->_normal;
+
+           pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
+
+           pinfo->_lagrange_multiplier += penalty * distance_vec * pinfo->_normal;
+           // Frictional capacity
+            const Real capacity( _friction_coefficient * (pen_force * pinfo->_normal < 0 ?
+            -pen_force * pinfo->_normal : 0) );
+
+
+           RealVectorValue contact_force_normal( ( pinfo->_lagrange_multiplier + (pen_force * pinfo->_normal) ) * pinfo->_normal );
+
+           RealVectorValue tangential_inc_slip =
+               pinfo->_incremental_slip -
+               (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+
+           RealVectorValue inc_pen_force_tangential = pinfo->_lagrange_multiplier_slip + penalty_slip * tangential_inc_slip;
+
+           RealVectorValue tau_old = pinfo->_contact_force_old -
+            pinfo->_normal * (pinfo->_normal * pinfo->_contact_force_old);
+           // Elastic predictor
+           RealVectorValue contact_force_tangential = inc_pen_force_tangential + tau_old;
+
+
+           // Tangential magnitude of elastic predictor
+           const Real tan_mag(contact_force_tangential.norm());
+
+           if (tan_mag > capacity)
+             pinfo->_lamrangian_multiplier_slip = - tau_old + capacity * contact_force_tangential / tan_mag;
+             else
+             pinfo->_lamrangian_multiplier_slip += _penalty_slip * tangential_inc_slip;
+         }
+  }
 
          //pinfo->_lagrange_multiplier = std::min(0.0,pinfo->_lagrange_multiplier);
 
@@ -467,7 +506,9 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
   }
 
   RealVectorValue distance_vec(_mesh.nodeRef(node->id()) - pinfo->_closest_point);
-  const Real penalty = getPenalty(*pinfo);
+  const Real penalty = getPenalty(*pinfo,_penalty);
+  const Real penalty_slip = getPenalty(*pinfo,_penalty_slip);
+
   RealVectorValue pen_force(penalty * distance_vec);
 
   switch (_model)
@@ -608,19 +649,22 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
                          (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
                              pinfo->_normal;
 
-          pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier_normal * pinfo->_normal;
+          pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
 
 
           // Frictional capacity
            const Real capacity( _friction_coefficient * (pen_force * pinfo->_normal < 0 ?
            -pen_force * pinfo->_normal : 0) );
 
-          //const Real capacity(_friction_coefficient *
-          //                    (res_vec * pinfo->_normal > 0 ? res_vec * pinfo->_normal : 0));
 
-          RealVectorValue contact_force_normal( ( pinfo->_lagrange_multiplier_normal  + (pen_force * pinfo->_normal) ) * pinfo->_normal );
+          RealVectorValue contact_force_normal( ( pinfo->_lagrange_multiplier + (pen_force * pinfo->_normal) ) * pinfo->_normal );
 
-          RealVectorValue inc_pen_force_tangential = pinfo->_lagrange_multiplier_slip + penalty * pinfo->_incremental_slip;
+          RealVectorValue tangential_inc_slip =
+              pinfo->_incremental_slip -
+              (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+
+          RealVectorValue inc_pen_force_tangential = pinfo->_lagrange_multiplier_slip + penalty_slip * tangential_inc_slip;
 
           // Elastic predictor
           RealVectorValue contact_force_tangential =
@@ -734,7 +778,7 @@ MechanicalContactConstraint::computeQpResidual(Moose::ConstraintType type)
       if (_formulation == CF_KINEMATIC)
       {
         RealVectorValue distance_vec(*_current_node - pinfo->_closest_point);
-        const Real penalty = getPenalty(*pinfo);
+        const Real penalty = getPenalty(*pinfo,_penalty);
         RealVectorValue pen_force(penalty * distance_vec);
 
         if (_model == CM_FRICTIONLESS)
@@ -756,7 +800,7 @@ MechanicalContactConstraint::computeQpResidual(Moose::ConstraintType type)
       else if (_formulation == CF_TANGENTIAL_PENALTY && _model == CM_COULOMB)
       {
         RealVectorValue distance_vec(*_current_node - pinfo->_closest_point);
-        const Real penalty = getPenalty(*pinfo);
+        const Real penalty = getPenalty(*pinfo,_penalty);
         RealVectorValue pen_force(penalty * distance_vec);
         resid += pinfo->_normal(_component) * pinfo->_normal * pen_force;
       }
@@ -774,7 +818,8 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
 {
   PenetrationInfo * pinfo = _penetration_locator._penetration_info[_current_node->id()];
 
-  const Real penalty = getPenalty(*pinfo);
+  const Real penalty = getPenalty(*pinfo,_penalty);
+  const Real penalty_slip = getPenalty(*pinfo,_penalty_slip);
 
   switch (type)
   {
@@ -836,20 +881,18 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
 
             case CF_AUGMENTED_LAGRANGE:
             {
-              Real norml_comp = _phi_slave[_j][_qp] * penalty_normal * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+              Real norml_comp = _phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+
+              Real tang_comp = 0.0;
 
               if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
                   pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
               {
-
-                Real tang_comp = _phi_slave[_j][_qp] * penalty_slip * _test_slave[_i][_qp] *
+                tang_comp += _phi_slave[_j][_qp] * penalty_slip * _test_slave[_i][_qp] *
                             (1.0 - pinfo->_normal(_component) * pinfo->_normal(_component));
-
-                return normal_comp + tang_comp;
               }
 
-                return normal_comp;
-
+                return normal_comp + tang_comp;
             }
             case CF_TANGENTIAL_PENALTY:
             {
@@ -961,12 +1004,20 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
 
             case CF_PENALTY:
             case CF_AUGMENTED_LAGRANGE:
+            {
+              Real norml_comp = -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+
+              Real tang_comp = 0.0;
+
               if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
-                  pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
-                return -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] *
-                       pinfo->_normal(_component) * pinfo->_normal(_component);
-              else
-                return -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp];
+                    pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
+              {
+                  tang_comp -= _phi_master[_j][_qp] * penalty_slip * _test_slave[_i][_qp] *
+                              (1.0 - pinfo->_normal(_component) * pinfo->_normal(_component));
+              }
+
+              return normal_comp + tang_comp;
+            }
 
             case CF_TANGENTIAL_PENALTY:
             {
@@ -1072,12 +1123,20 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
 
             case CF_PENALTY:
             case CF_AUGMENTED_LAGRANGE:
-              if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
-                  pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
-                return -_test_master[_i][_qp] * penalty * _phi_slave[_j][_qp] *
-                       pinfo->_normal(_component) * pinfo->_normal(_component);
-              else
-                return -_test_master[_i][_qp] * penalty * _phi_slave[_j][_qp];
+            {
+                Real norml_comp = -_phi_slave[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+
+                Real tang_comp = 0.0;
+
+                if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+                      pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
+                {
+                    tang_comp -= _phi_slave[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
+                                (1.0 - pinfo->_normal(_component) * pinfo->_normal(_component));
+                }
+
+                return normal_comp + tang_comp;
+            }
 
             case CF_TANGENTIAL_PENALTY:
             {
@@ -1144,6 +1203,59 @@ MechanicalContactConstraint::computeQpJacobian(Moose::ConstraintJacobianType typ
           }
 
         case CM_COULOMB:
+
+          switch (_formulation)
+          {
+            case CF_KINEMATIC:
+            {
+              if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+                  pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
+              {
+                Node * curr_master_node = _current_master->get_node(_j);
+
+                RealVectorValue jac_vec;
+                for (unsigned int i = 0; i < _mesh_dimension; ++i)
+                {
+                  dof_id_type dof_number = _current_node->dof_number(0, _vars[i], 0);
+                  jac_vec(i) = (*_jacobian)(dof_number,
+                                            curr_master_node->dof_number(0, _vars[_component], 0));
+                }
+                return -pinfo->_normal(_component) * (pinfo->_normal * jac_vec) +
+                       (_phi_master[_j][_qp] * penalty * _master_slave[_i][_qp]) *
+                           pinfo->_normal(_component) * pinfo->_normal(_component);
+              }
+              else
+              {
+                Node * curr_master_node = _current_master->get_node(_j);
+                const Real curr_jac =
+                    (*_jacobian)(_current_node->dof_number(0, _vars[_component], 0),
+                                 curr_master_node->dof_number(0, _vars[_component], 0));
+                return -curr_jac + _phi_master[_j][_qp] * penalty * _test_slave[_i][_qp];
+              }
+            }
+
+            case CF_PENALTY:
+
+            case CF_AUGMENTED_LAGRANGE:
+            {
+              Real norml_comp = _phi_master[_j][_qp] * penalty * _test_master[_i][_qp] * pinfo->_normal(_component) * pinfo->_normal(_component);
+
+              Real tang_comp = 0.0;
+
+              if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+                    pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
+              {
+                  tang_comp += _phi_master[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
+                              (1.0 - pinfo->_normal(_component) * pinfo->_normal(_component));
+              }
+
+              return normal_comp + tang_comp;
+            }
+
+            case CF_TANGENTIAL_PENALTY:
+          }
+
+
         case CM_COULOMB_MP:
         case CM_GLUED:
           switch (_formulation)
@@ -1187,12 +1299,14 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
 {
   PenetrationInfo * pinfo = _penetration_locator._penetration_info[_current_node->id()];
 
-  const Real penalty = getPenalty(*pinfo);
+  const Real penalty = getPenalty(*pinfo,_penalty);
+  const Real penalty_slip = getPenalty(*pinfo,_penalty_slip);
 
   unsigned int coupled_component;
   Real normal_component_in_coupled_var_dir = 1.0;
   if (getCoupledVarComponent(jvar, coupled_component))
     normal_component_in_coupled_var_dir = pinfo->_normal(coupled_component);
+
 
   switch (type)
   {
@@ -1240,11 +1354,27 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
                    (_phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp]) *
                        pinfo->_normal(_component) * normal_component_in_coupled_var_dir;
           }
-          else if ((_formulation == CF_PENALTY || _formulation == CF_AUGMENTED_LAGRANGE) &&
+          else if ((_formulation == CF_PENALTY ) &&
                    (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
                     pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION))
             return _phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp] *
                    pinfo->_normal(_component) * normal_component_in_coupled_var_dir;
+
+          else if ( _formulation == CF_AUGMENTED_LAGRANGE &&
+                            (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+                             pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION))
+          {
+            RealVectorValue tangential_inc_slip =
+                pinfo->_incremental_slip -
+                (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+            RealVectorValue tan_slip_dir = tangential_inc_slip / tangential_inc_slip.norm();
+            Real tan_component_in_coupled_var_dir = tan_slip_dir(coupled_component);
+            return _phi_slave[_j][_qp] * penalty * _test_slave[_i][_qp] *
+                   pinfo->_normal(_component) * normal_component_in_coupled_var_dir
+                +  _phi_slave[_j][_qp] * penalty_slip * _test_slave[_i][_qp] *
+                            tan_slip_dir(_component) * tan_component_in_coupled_var_dir;
+          }
           else
           {
             const Real curr_jac = (*_jacobian)(_current_node->dof_number(0, _vars[_component], 0),
@@ -1313,11 +1443,27 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
                    (_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp]) *
                        pinfo->_normal(_component) * normal_component_in_coupled_var_dir;
           }
-          else if ((_formulation == CF_PENALTY || _formulation == CF_AUGMENTED_LAGRANGE) &&
+          else if ((_formulation == CF_PENALTY) &&
                    (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
                     pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION))
             return -_phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] *
                    pinfo->_normal(_component) * normal_component_in_coupled_var_dir;
+
+          else if ( _formulation == CF_AUGMENTED_LAGRANGE &&
+                                     (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+                                      pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION))
+          {
+             RealVectorValue tangential_inc_slip =
+                    pinfo->_incremental_slip -
+                         (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+             RealVectorValue tan_slip_dir = tangential_inc_slip / tangential_inc_slip.norm();
+             Real tan_component_in_coupled_var_dir = tan_slip_dir(coupled_component);
+             return - _phi_master[_j][_qp] * penalty * _test_slave[_i][_qp] *
+                            pinfo->_normal(_component) * normal_component_in_coupled_var_dir
+                   -  _phi_master[_j][_qp] * penalty_slip * _test_slave[_i][_qp] *
+                            tan_slip_dir(_component) * tan_component_in_coupled_var_dir;
+          }
           else
             return 0.0;
 
@@ -1382,13 +1528,24 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
 
             case CF_PENALTY:
             case CF_AUGMENTED_LAGRANGE:
+            {
               if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
                   pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION)
-                return -_test_master[_i][_qp] * penalty * _phi_slave[_j][_qp] *
-                       pinfo->_normal(_component) * normal_component_in_coupled_var_dir;
+              {
+                    RealVectorValue tangential_inc_slip =
+                        pinfo->_incremental_slip -
+                        (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+                    RealVectorValue tan_slip_dir = tangential_inc_slip / tangential_inc_slip.norm();
+                    Real tan_component_in_coupled_var_dir = tan_slip_dir(coupled_component);
+                    return - _phi_slave[_j][_qp] * penalty * _test_master[_i][_qp] *
+                             pinfo->_normal(_component) * normal_component_in_coupled_var_dir
+                           - _phi_slave[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
+                              tan_slip_dir(_component) * tan_component_in_coupled_var_dir;
+              }
               else
                 return 0.0;
-
+            }
             case CF_TANGENTIAL_PENALTY:
             {
               if (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
@@ -1453,6 +1610,25 @@ MechanicalContactConstraint::computeQpOffDiagJacobian(Moose::ConstraintJacobianT
           }
 
         case CM_COULOMB:
+        {
+          if (_formulation == CF_AUGMENTED_LAGRANGE && (pinfo->_mech_status == PenetrationInfo::MS_SLIPPING ||
+              pinfo->_mech_status == PenetrationInfo::MS_SLIPPING_FRICTION) )
+          {
+                RealVectorValue tangential_inc_slip =
+                    pinfo->_incremental_slip -
+                    (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+
+                RealVectorValue tan_slip_dir = tangential_inc_slip / tangential_inc_slip.norm();
+                Real tan_component_in_coupled_var_dir = tan_slip_dir(coupled_component);
+                return _phi_master[_j][_qp] * penalty * _test_master[_i][_qp] *
+                         pinfo->_normal(_component) * normal_component_in_coupled_var_dir
+                       _phi_master[_j][_qp] * penalty_slip * _test_master[_i][_qp] *
+                          tan_slip_dir(_component) * tan_component_in_coupled_var_dir;
+          }
+          else
+            return 0.0;
+        }
+
         case CM_COULOMB_MP:
         case CM_GLUED:
           if ((_formulation == CF_PENALTY || _formulation == CF_AUGMENTED_LAGRANGE) &&
@@ -1490,9 +1666,10 @@ MechanicalContactConstraint::nodalArea(PenetrationInfo & pinfo)
 }
 
 Real
-MechanicalContactConstraint::getPenalty(PenetrationInfo & pinfo)
+MechanicalContactConstraint::getPenalty(PenetrationInfo & pinfo, Real penalty_param)
 {
-  Real penalty = _penalty;
+
+  Real penalty = penalty_param;
   if (_normalize_penalty)
     penalty *= nodalArea(pinfo);
 

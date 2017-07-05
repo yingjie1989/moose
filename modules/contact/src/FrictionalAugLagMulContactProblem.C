@@ -989,12 +989,12 @@ FrictionalContactProblem::checkNonlinearConvergence(std::string & msg,
         _do_lagmul_update = true;
         _do_slip_update = true;
 
-        nonlinear_sys.updateLagMulNormal();
+        nonlinear_sys.updateLagMul();
 
       // Just to calculate slip residual
 
        // force it to keep iterating
-          nonlinear_sys.updateLagMulTauInc();
+        //  nonlinear_sys.updateLagMulTauInc();
           //reason = MOOSE_NONLINEAR_ITERATING;
           _console << "Force slip update slip_resid > target: " << _slip_residual << std::endl;
         }
