@@ -224,6 +224,8 @@ MechanicalContactConstraint::jacobianSetup()
 void
 MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 {
+  _console << "Update Augmented Lagrangian Multiplier" << "\n";
+
   for (auto & pinfo_pair : _penetration_locator._penetration_info)
   {
     const dof_id_type slave_node_num = pinfo_pair.first;
@@ -250,8 +252,10 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
     pinfo->_contact_force.zero();
   }
 
-  if (beginning_of_step)
+  if (beginning_of_step){
      pinfo->_lagrange_multiplier = 0.0;
+     pinfo->_lagrange_multiplier_slip = pinfo->_normal * 0.0;
+  }
 
   if (pinfo->isCaptured()){
          if (_model == CM_FRICTIONLESS)
@@ -298,7 +302,8 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 
          //pinfo->_lagrange_multiplier = std::min(0.0,pinfo->_lagrange_multiplier);
 
-      	//_console << "Augmented Lagrangian Multiplier is " << pinfo->_lagrange_multiplier << "\n";
+      	_console << "Augmented Lagrangian Multiplier is " << pinfo->_lagrange_multiplier << "\n";
+        _console << "Augmented Lagrangian Multiplier in slip dir is " << pinfo->_lagrange_multiplier_slip(0) << "\n";
 
    }
 }
