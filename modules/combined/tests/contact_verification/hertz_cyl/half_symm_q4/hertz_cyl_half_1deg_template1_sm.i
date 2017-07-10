@@ -20,6 +20,8 @@
 []
 
 [AuxVariables]
+  [./contact_traction]
+  [../]
   [./stress_xx]
     order = CONSTANT
     family = MONOMIAL

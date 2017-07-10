@@ -27,6 +27,8 @@
 [AuxVariables]
   [./penetration]
   [../]
+  [./contact_traction]
+  [../]
   [./inc_slip_x]
   [../]
   [./inc_slip_y]
@@ -225,5 +227,3 @@
   reference_residual_variables = 'saved_x saved_y'
   contact_reference_residual_variables = 'saved_x saved_y'
 []
-
-
