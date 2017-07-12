@@ -263,6 +263,7 @@ FrictionalAugLagMulContactProblem::updateContactReferenceResidual()
   }
   _console << "Contact reference convergence residual: " << _refResidContact << std::endl;
   ;
+
 }
 
 bool
@@ -288,6 +289,9 @@ FrictionalAugLagMulContactProblem::updateSolution(NumericVector<Number> & vec_so
   {
     updateReferenceResidual();
     updateContactReferenceResidual();
+    _console << "I am the next step\n" << std::endl;
+
+
     _console << "Slip Update: " << _num_iterations << std::endl;
     _console << "Iter  #Cont     #Slip     #TooFar   Slip resid  Inc Slip    It Slip" << std::endl;
 
@@ -956,7 +960,11 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
                                                           my_div_threshold);
 
   _refResidContact = ref_resid; // use initial residual if no reference variables are specified
+
   updateContactReferenceResidual();
+
+  _console << "check whether to run the Augmented LM loop\n";
+
 
   ++_num_nl_its_since_contact_update;
 
@@ -982,10 +990,10 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
             else
             _augLM_repeat_step = false;*/
 
-            if (_displaced_problem != NULL)
+            /*if (_displaced_problem != NULL)
                   _augLM_repeat_step = nonlinear_sys.updateLagMul(true);
             else
-                  _augLM_repeat_step = nonlinear_sys.updateLagMul(false);
+                  _augLM_repeat_step = nonlinear_sys.updateLagMul(false);*/
 
 
 
