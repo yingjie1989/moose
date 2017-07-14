@@ -19,11 +19,11 @@
 #include "NavierStokesApp.h"
 #include "PhaseFieldApp.h"
 #include "RichardsApp.h"
-#include "SolidMechanicsApp.h"
+//#include "SolidMechanicsApp.h"
 #include "StochasticToolsApp.h"
 #include "TensorMechanicsApp.h"
-#include "WaterSteamEOSApp.h"
-#include "XFEMApp.h"
+//#include "WaterSteamEOSApp.h"
+//#include "XFEMApp.h"
 #include "PorousFlowApp.h"
 #include "RdgApp.h"
 #include "LevelSetApp.h"
@@ -76,11 +76,11 @@ CombinedApp::registerObjects(Factory & factory)
   NavierStokesApp::registerObjects(factory);
   PhaseFieldApp::registerObjects(factory);
   RichardsApp::registerObjects(factory);
-  SolidMechanicsApp::registerObjects(factory);
+//  SolidMechanicsApp::registerObjects(factory);
   StochasticToolsApp::registerObjects(factory);
   TensorMechanicsApp::registerObjects(factory);
-  WaterSteamEOSApp::registerObjects(factory);
-  XFEMApp::registerObjects(factory);
+//  WaterSteamEOSApp::registerObjects(factory);
+//  XFEMApp::registerObjects(factory);
   PorousFlowApp::registerObjects(factory);
   RdgApp::registerObjects(factory);
   LevelSetApp::registerObjects(factory);
@@ -103,11 +103,11 @@ CombinedApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
   NavierStokesApp::associateSyntax(syntax, action_factory);
   PhaseFieldApp::associateSyntax(syntax, action_factory);
   RichardsApp::associateSyntax(syntax, action_factory);
-  SolidMechanicsApp::associateSyntax(syntax, action_factory);
+//  SolidMechanicsApp::associateSyntax(syntax, action_factory);
   StochasticToolsApp::associateSyntax(syntax, action_factory);
   TensorMechanicsApp::associateSyntax(syntax, action_factory);
-  WaterSteamEOSApp::associateSyntax(syntax, action_factory);
-  XFEMApp::associateSyntax(syntax, action_factory);
+//  WaterSteamEOSApp::associateSyntax(syntax, action_factory);
+//  XFEMApp::associateSyntax(syntax, action_factory);
   PorousFlowApp::associateSyntax(syntax, action_factory);
   RdgApp::associateSyntax(syntax, action_factory);
   LevelSetApp::associateSyntax(syntax, action_factory);

@@ -254,7 +254,8 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 
   if (beginning_of_step){
      pinfo->_lagrange_multiplier = 0.0;
-     pinfo->_lagrange_multiplier_slip = pinfo->_normal * 0.0;
+     RealVectorValue _lm_slip_init(0.0,0.0,0.0);
+     pinfo->_lagrange_multiplier_slip = _lm_slip_init;
   }
 
   if (pinfo->isCaptured()){
@@ -334,20 +335,25 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
     if (!pinfo || pinfo->_node->n_comp(_sys.number(), _vars[_component]) < 1)
       continue;
 
-    //const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
 
     const Real distance = pinfo->_normal * (pinfo->_closest_point - _mesh.nodeRef(slave_node_num));
 
-  //if (!pinfo->isCaptured() &&
-  //      MooseUtils::absoluteFuzzyGreaterEqual(distance, 0.0, _capture_tolerance))
-  //pinfo->capture();
 
-  //else if (_model != CM_GLUED && pinfo->isCaptured() && _tension_release >= 0.0 &&
-  //         -contact_pressure >= _tension_release && pinfo->_locked_this_step < 2)
-  //{
-  //  pinfo->release();
-  //  pinfo->_contact_force.zero();
-  //}
+    //The following piece of code may be removed I am not eure now
+    const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
+
+  if (!pinfo->isCaptured() &&
+        MooseUtils::absoluteFuzzyGreaterEqual(distance, 0.0, _capture_tolerance))
+  pinfo->capture();
+
+  else if (_model != CM_GLUED && pinfo->isCaptured() && _tension_release >= 0.0 &&
+           -contact_pressure >= _tension_release && pinfo->_locked_this_step < 2)
+  {
+    pinfo->release();
+    pinfo->_contact_force.zero();
+  }
+
+  //The above piece of code could be removed
 
     if (pinfo->isCaptured()){
 	     if (contactResidual < std::abs(distance) )

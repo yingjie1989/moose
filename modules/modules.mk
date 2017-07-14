@@ -12,22 +12,22 @@ ifeq ($(ALL_MODULES),yes)
         PHASE_FIELD               := yes
         RDG                       := yes
         RICHARDS                  := yes
-        SOLID_MECHANICS           := yes
+        SOLID_MECHANICS           := no
         STOCHASTIC_TOOLS          := yes
         TENSOR_MECHANICS          := yes
-        WATER_STEAM_EOS           := yes
-        XFEM                      := yes
+        WATER_STEAM_EOS           := no
+        XFEM                      := no
         POROUS_FLOW               := yes
         LEVEL_SET                 := yes
 endif
 
-ifeq ($(XFEM),yes)
-        SOLID_MECHANICS           := yes
-endif
+#ifeq ($(XFEM),yes)
+#        SOLID_MECHANICS           := yes
+#endif
 
-ifeq ($(SOLID_MECHANICS),yes)
-        TENSOR_MECHANICS          := yes
-endif
+#ifeq ($(SOLID_MECHANICS),yes)
+#        TENSOR_MECHANICS          := yes
+#endif
 
 ifeq ($(POROUS_FLOW),yes)
         TENSOR_MECHANICS          := yes
@@ -45,7 +45,7 @@ ifeq ($(PHASE_FIELD),yes)
 endif
 
 # The master list of all moose modules
-MODULE_NAMES := "chemical_reactions contact fluid_properties heat_conduction linear_elasticity misc navier_stokes phase_field richards solid_mechanics tensor_mechanics water_steam_eos xfem porous_flow rdg level_set"
+MODULE_NAMES := "chemical_reactions contact fluid_properties heat_conduction linear_elasticity misc navier_stokes phase_field richards tensor_mechanics  porous_flow rdg level_set"
 
 ###############################################################################
 ########################## MODULE REGISTRATION ################################
@@ -128,15 +128,15 @@ ifeq ($(RICHARDS),yes)
   include $(FRAMEWORK_DIR)/app.mk
 endif
 
-ifeq ($(SOLID_MECHANICS),yes)
-  APPLICATION_DIR    := $(MOOSE_DIR)/modules/solid_mechanics
-  APPLICATION_NAME   := solid_mechanics
-
-  #Dependency on tensor mechanics
-  DEPEND_MODULES     := tensor_mechanics
-  SUFFIX             := sm
-  include $(FRAMEWORK_DIR)/app.mk
-endif
+#ifeq ($(SOLID_MECHANICS),yes)
+#  APPLICATION_DIR    := $(MOOSE_DIR)/modules/solid_mechanics
+#  APPLICATION_NAME   := solid_mechanics
+#
+#  #Dependency on tensor mechanics
+#  DEPEND_MODULES     := tensor_mechanics
+#  SUFFIX             := sm
+#  include $(FRAMEWORK_DIR)/app.mk
+#endif
 
 ifeq ($(STOCHASTIC_TOOLS),yes)
   APPLICATION_DIR    := $(MOOSE_DIR)/modules/stochastic_tools
@@ -145,22 +145,22 @@ ifeq ($(STOCHASTIC_TOOLS),yes)
   include $(FRAMEWORK_DIR)/app.mk
 endif
 
-ifeq ($(WATER_STEAM_EOS),yes)
-  APPLICATION_DIR    := $(MOOSE_DIR)/modules/water_steam_eos
-  APPLICATION_NAME   := water_steam_eos
-  SUFFIX             := ws
-  include $(FRAMEWORK_DIR)/app.mk
-endif
+#ifeq ($(WATER_STEAM_EOS),yes)
+#  APPLICATION_DIR    := $(MOOSE_DIR)/modules/water_steam_eos
+#  APPLICATION_NAME   := water_steam_eos
+#  SUFFIX             := ws
+#  include $(FRAMEWORK_DIR)/app.mk
+#endif
 
-ifeq ($(XFEM),yes)
-  APPLICATION_DIR    := $(MOOSE_DIR)/modules/xfem
-  APPLICATION_NAME   := xfem
+#ifeq ($(XFEM),yes)
+#  APPLICATION_DIR    := $(MOOSE_DIR)/modules/xfem
+#  APPLICATION_NAME   := xfem
 
   #Dependency on solid_mechanics
-  DEPEND_MODULES     := solid_mechanics
-  SUFFIX             := xfem
-  include $(FRAMEWORK_DIR)/app.mk
-endif
+#  DEPEND_MODULES     := solid_mechanics
+#  SUFFIX             := xfem
+#  include $(FRAMEWORK_DIR)/app.mk
+#endif
 
 ifeq ($(POROUS_FLOW),yes)
   APPLICATION_DIR    := $(MOOSE_DIR)/modules/porous_flow

@@ -262,7 +262,6 @@ FrictionalAugLagMulContactProblem::updateContactReferenceResidual()
     _refResidContact = std::sqrt(_refResidContact);
   }
   _console << "Contact reference convergence residual: " << _refResidContact << std::endl;
-  ;
 }
 
 bool
@@ -957,6 +956,10 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
 
   _refResidContact = ref_resid; // use initial residual if no reference variables are specified
   updateContactReferenceResidual();
+
+  _console << "I am the next step \n";
+
+
 
   ++_num_nl_its_since_contact_update;
 
