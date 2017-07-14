@@ -35,15 +35,6 @@ public:
   virtual void initialSetup();
   virtual void timestepSetup();
 
-  virtual bool shouldUpdateSolution();
-  virtual bool updateSolution(NumericVector<Number> & vec_solution,
-                              NumericVector<Number> & ghosted_solution);
-
-  virtual void predictorCleanup(NumericVector<Number> & ghosted_solution);
-
-  bool enforceRateConstraint(NumericVector<Number> & vec_solution,
-                             NumericVector<Number> & ghosted_solution);
-
   bool calculateSlip(const NumericVector<Number> & ghosted_solution,
                      std::vector<SlipData> * iterative_slip);
   bool calculatePenetration(const NumericVector<Number> & ghosted_solution);
@@ -60,11 +51,11 @@ public:
                                                const Real slip_too_far_factor,
                                                const int dim);
 
-  void applySlip(NumericVector<Number> & vec_solution,
+  /*void applySlip(NumericVector<Number> & vec_solution,
                  NumericVector<Number> & ghosted_solution,
                  std::vector<SlipData> & iterative_slip);
 
-  unsigned int numLocalFrictionalConstraints();
+  unsigned int numLocalFrictionalConstraints();*/
 
   void updateContactReferenceResidual();
 
@@ -81,7 +72,7 @@ public:
                                                                     const Real ref_resid,
                                                                     const Real div_threshold);
 
-  void updateContactPoints(NumericVector<Number> & ghosted_solution, bool update_incremental_slip);
+  //void updateContactPoints(NumericVector<Number> & ghosted_solution, bool update_incremental_slip);
 
   void updateIncrementalSlip();
 
