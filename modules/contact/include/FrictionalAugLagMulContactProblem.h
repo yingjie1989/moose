@@ -35,28 +35,6 @@ public:
   virtual void initialSetup();
   virtual void timestepSetup();
 
-  bool calculateSlip(const NumericVector<Number> & ghosted_solution,
-                     std::vector<SlipData> * iterative_slip);
-  bool calculatePenetration(const NumericVector<Number> & ghosted_solution);
-
-  ContactState calculateInteractionSlip(RealVectorValue & slip,
-                                               Real & slip_residual,
-                                               const RealVectorValue & normal,
-                                               const Real lagrange_multiplier,
-                                               const RealVectorValue & residual,
-                                               const RealVectorValue & incremental_slip,
-                                               const RealVectorValue & stiffness,
-                                               const Real friction_coefficient,
-                                               const Real slip_factor,
-                                               const Real slip_too_far_factor,
-                                               const int dim);
-
-  /*void applySlip(NumericVector<Number> & vec_solution,
-                 NumericVector<Number> & ghosted_solution,
-                 std::vector<SlipData> & iterative_slip);
-
-  unsigned int numLocalFrictionalConstraints();*/
-
   void updateContactReferenceResidual();
 
   virtual MooseNonlinearConvergenceReason checkNonlinearConvergence(std::string & msg,
@@ -72,9 +50,6 @@ public:
                                                                     const Real ref_resid,
                                                                     const Real div_threshold);
 
-  //void updateContactPoints(NumericVector<Number> & ghosted_solution, bool update_incremental_slip);
-
-  void updateIncrementalSlip();
 
 protected:
   std::map<std::pair<int, int>, InteractionParams> _interaction_params;

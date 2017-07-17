@@ -81,7 +81,7 @@ public:
 
   virtual bool addCouplingEntriesToJacobian() { return _master_slave_jacobian; }
 
-  bool shouldApply();
+  bool shouldApply() override;
   void computeContactForce(PenetrationInfo * pinfo);
 
 protected:
@@ -101,6 +101,8 @@ protected:
   const Real _tension_release;
   const Real _capture_tolerance;
   const Real _penetration_tolerance;
+  const Real _stickking_tolerance;
+  const Real _frictionalforce_tolerance;
   const unsigned int _stick_lock_iterations;
   const Real _stick_unlock_factor;
   bool _update_contact_set;

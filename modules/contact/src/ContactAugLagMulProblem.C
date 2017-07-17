@@ -52,30 +52,23 @@ validParams<ContactAugLagMulProblem>()
   params.addRequiredParam<NonlinearVariableName>("disp_y",
                                                  "Variable containing the y displacement");
   params.addParam<NonlinearVariableName>("disp_z", "Variable containing the z displacement");
-  params.addRequiredParam<AuxVariableName>("residual_x",
-                                           "Auxiliary variable containing the saved x residual");
-  params.addRequiredParam<AuxVariableName>("residual_y",
-                                           "Auxiliary variable containing the saved y residual");
-  params.addParam<AuxVariableName>("residual_z",
-                                   "Auxiliary variable containing the saved z residual");
+  //params.addRequiredParam<AuxVariableName>("residual_x",
+  //                                         "Auxiliary variable containing the saved x residual");
+//  params.addRequiredParam<AuxVariableName>("residual_y",
+  //                                         "Auxiliary variable containing the saved y residual");
+  //params.addParam<AuxVariableName>("residual_z",
+  //                                 "Auxiliary variable containing the saved z residual");
 
   params.addParam<int>("minimum_update_iterations", 1, "Minimum number of update Lagrangian Multiplier iterations per step");
   params.addParam<int>(
       "maximum_update_iterations", 100, "Maximum number of update Lagrangian Multiplier iterations per step");
 
-  params.addParam<Real>("target_contact_residual",
-                        "Augmented Lagrangian Multiplier contact residual convergence criterion");
-
-  params.addParam<Real>("target_relative_contact_residual",
-                                              "Augmented Lagrangian Multiplier contact residual convergence criterion");
   params.addParam<Real>("contact_lagmul_tolerance_factor",
                                               "Augmented Lagrangian Multiplier tolerance factor");
 
-  params.addParam<Real>("target_relative_contact_residual",
-                        "Frictional contact relative residual convergence criterion");
-  params.addParam<std::vector<std::string>>(
-      "contact_reference_residual_variables",
-      "Set of variables that provide reference residuals for relative contact convergence check");
+  //params.addParam<std::vector<std::string>>(
+  //    "contact_reference_residual_variables",
+  //    "Set of variables that provide reference residuals for relative contact convergence check");
 
 
   return params;
@@ -93,8 +86,6 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
     _refResidContact(0.0),
     _do_lagmul_update(false),
     _num_lagmul_iterations(0),
-    _target_contact_residual(0.0),
-    _target_relative_contact_residual(0.0),
     _contact_lagmul_tol_factor(1.0),
     _num_nl_its_since_contact_update(0),
     _num_contact_nodes(0)
@@ -111,25 +102,25 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
   unsigned int dim = getNonlinearSystemBase().subproblem().mesh().dimension();
 
   _disp_x = params.get<NonlinearVariableName>("disp_x");
-  _residual_x = params.get<AuxVariableName>("residual_x");
+  //_residual_x = params.get<AuxVariableName>("residual_x");
 
   _disp_y = params.get<NonlinearVariableName>("disp_y");
-  _residual_y = params.get<AuxVariableName>("residual_y");
+  //_residual_y = params.get<AuxVariableName>("residual_y");
 
   if (dim == 3)
   {
     if (!params.isParamValid("disp_z"))
       mooseError("Missing disp_z in FrictionalContactProblem");
-    if (!params.isParamValid("residual_z"))
-      mooseError("Missing residual_z in FrictionalContactProblem");
+    //if (!params.isParamValid("residual_z"))
+    //  mooseError("Missing residual_z in FrictionalContactProblem");
     _disp_z = params.get<NonlinearVariableName>("disp_z");
-    _residual_z = params.get<AuxVariableName>("residual_z");
+  //  _residual_z = params.get<AuxVariableName>("residual_z");
   }
 
   unsigned int num_interactions = master.size();
   if (num_interactions != slave.size())
     mooseError(
-        "Sizes of master surface and slave surface lists must match in FrictionalContactProblem");
+        "Sizes of master surface and slave surface lists must match in ContactAugLagMulProblem");
 
   for (unsigned int i = 0; i < master.size(); ++i)
   {
@@ -143,26 +134,9 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
   _max_lagmul_iters = params.get<int>("maximum_update_iterations");
   //_lagmul_updates_per_iter = params.get<int>("lagmul_updates_per_iteration");
 
-  bool have_target = false;
-  bool have_target_relative = false;
-  if (params.isParamValid("target_contact_residual"))
-  {
-    _target_contact_residual = params.get<Real>("target_contact_residual");
-    have_target = true;
-  }
-  if (params.isParamValid("target_relative_contact_residual"))
-  {
-    _target_relative_contact_residual = params.get<Real>("target_relative_contact_residual");
-    have_target_relative = true;
-  }
-  if (!(have_target || have_target_relative))
-    mooseError("Must specify either target_contact_residual or target_relative_contact_residual");
-
-  //_contact_lagmul_tol_factor = params.get<Real>("contact_lagmul_tolerance_factor");
-
-  if (params.isParamValid("contact_reference_residual_variables"))
-    _contactRefResidVarNames =
-        params.get<std::vector<std::string>>("contact_reference_residual_variables");
+  //if (params.isParamValid("contact_reference_residual_variables"))
+  //  _contactRefResidVarNames =
+  //      params.get<std::vector<std::string>>("contact_reference_residual_variables");
 }
 
 void
@@ -249,7 +223,6 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
   _refResidContact = ref_resid; // use initial residual if no reference variables are specified
   updateContactReferenceResidual();
 
-  int min_nl_its_since_contact_update = 1;
   ++_num_nl_its_since_contact_update;
 
   if ((reason > 0) ||                         // converged
@@ -258,16 +231,13 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
         checkConvergenceIndividVars(
             fnorm, abstol * _contact_lagmul_tol_factor, rtol * _contact_lagmul_tol_factor, ref_resid))))
   {
-    _console << "Augmentd Lagrangian Multiplier iteration " << _num_lagmul_iterations << " ";
+    _console << "Augmentd Lagrangian Multiplier iteration " << _num_lagmul_iterations << "\n";
     if (_num_lagmul_iterations < _max_lagmul_iters)
     { // do a slip update if there is another iteration
 
         NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
         nonlinear_sys.update();
         const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
-
-        //calculateSlip(*ghosted_solution, nullptr); // Just to calculate slip residual
-        //Real _pene_residual = calculatePenetration(*ghosted_solution);
 
         bool _augLM_repeat_step;
 
@@ -279,7 +249,7 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
         if (_augLM_repeat_step)
         { // force it to keep iterating
           reason = MOOSE_NONLINEAR_ITERATING;
-          _console << "Contact penetration > tolerance" << std::endl;
+          _console << "Contact constraint is not satisfied \n" << std::endl;
           _num_lagmul_iterations ++;
         }
         else

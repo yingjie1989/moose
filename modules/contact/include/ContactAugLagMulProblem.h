@@ -71,8 +71,6 @@ protected:
   int _min_lagmul_iters;
   int _max_lagmul_iters;
   int _lagmul_updates_per_iter;
-  Real _target_contact_residual;
-  Real _target_relative_contact_residual;
   Real _contact_lagmul_tol_factor;
   int _num_nl_its_since_contact_update;
   int _num_contact_nodes;
