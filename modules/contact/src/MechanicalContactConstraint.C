@@ -366,7 +366,7 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
 
      RealVectorValue contact_force_tangential(pinfo->_contact_force - contact_force_normal);
 
-    RealVectorValue tangential_inc_slip = info->_incremental_slip -
+    RealVectorValue tangential_inc_slip = pinfo->_incremental_slip -
                                               (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
 
                                           // Magnitude of tangential predictor force

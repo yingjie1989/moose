@@ -691,7 +691,7 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
         nonlinear_sys.update();
         const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
 
-      //  bool _augLM_repeat_step = false;
+        bool _augLM_repeat_step = false;
         _do_lagmul_update = false;
         _do_slip_update = false;
 
