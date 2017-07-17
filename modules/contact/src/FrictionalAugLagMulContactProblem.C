@@ -262,190 +262,10 @@ FrictionalAugLagMulContactProblem::updateContactReferenceResidual()
     _refResidContact = std::sqrt(_refResidContact);
   }
   _console << "Contact reference convergence residual: " << _refResidContact << std::endl;
+  ;
+
 }
 
-bool
-FrictionalAugLagMulContactProblem::shouldUpdateSolution()
-{
-  return true;
-}
-
-bool
-FrictionalAugLagMulContactProblem::updateSolution(NumericVector<Number> & vec_solution,
-                                         NumericVector<Number> & ghosted_solution)
-{
-  bool solution_modified = false;
-
-  solution_modified |= enforceRateConstraint(vec_solution, ghosted_solution);
-
-  unsigned int nfc = numLocalFrictionalConstraints();
-  std::vector<SlipData> iterative_slip;
-  unsigned int dim = getNonlinearSystemBase().subproblem().mesh().dimension();
-  iterative_slip.reserve(nfc * dim);
-
-  if (_do_slip_update)
-  {
-    updateReferenceResidual();
-    updateContactReferenceResidual();
-    _console << "Slip Update: " << _num_iterations << std::endl;
-    _console << "Iter  #Cont     #Slip     #TooFar   Slip resid  Inc Slip    It Slip" << std::endl;
-
-    for (int i = 0; i < _slip_updates_per_iter; i++)
-    {
-      _console << std::left << std::setw(6) << i + 1;
-
-      bool updated_this_iter = calculateSlip(ghosted_solution, &iterative_slip);
-
-      _console << std::setw(10) << _num_contact_nodes << std::setw(10) << _num_slipping
-               << std::setw(10) << _num_slipped_too_far << std::setprecision(4) << std::setw(12)
-               << _slip_residual << std::setw(12) << _inc_slip_norm << std::setw(12)
-               << _it_slip_norm;
-
-      if (updated_this_iter)
-      {
-        if (_slip_residual < _target_contact_residual ||
-            _slip_residual < _target_relative_contact_residual * _refResidContact)
-        {
-          _console << "     Converged: Slip resid < tolerance, not applying this slip update"
-                   << std::endl;
-          break;
-        }
-        else
-        {
-          _console << std::endl;
-          applySlip(vec_solution, ghosted_solution, iterative_slip);
-        }
-      }
-      else
-      {
-        _console << "     Converged: No slipping nodes" << std::endl;
-        break;
-      }
-
-      solution_modified |= updated_this_iter;
-    }
-    _num_iterations++;
-    _do_slip_update = false;
-    _do_lagmul_update = false;
-    _num_nl_its_since_contact_update = 0;
-  }
-
-  return solution_modified;
-}
-
-void
-FrictionalAugLagMulContactProblem::predictorCleanup(NumericVector<Number> & ghosted_solution)
-{
-  updateContactPoints(ghosted_solution, true);
-}
-
-bool
-FrictionalAugLagMulContactProblem::enforceRateConstraint(NumericVector<Number> & vec_solution,
-                                                NumericVector<Number> & ghosted_solution)
-{
-  NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
-  unsigned int dim = nonlinear_sys.subproblem().mesh().dimension();
-
-  _displaced_problem->updateMesh(ghosted_solution, *_aux->currentSolution());
-
-  MooseVariable * disp_x_var = &getVariable(0, _disp_x);
-  MooseVariable * disp_y_var = &getVariable(0, _disp_y);
-  MooseVariable * disp_z_var = nullptr;
-  if (dim == 3)
-    disp_z_var = &getVariable(0, _disp_z);
-
-  bool updatedSolution = false;
-
-  if (getDisplacedProblem() && _interaction_params.size() > 0)
-  {
-    GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-    std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-        &displaced_geom_search_data._penetration_locators;
-
-    for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end();
-         ++plit)
-    {
-      PenetrationLocator & pen_loc = *plit->second;
-
-      bool frictional_contact_this_interaction = false;
-
-      std::map<std::pair<int, int>, InteractionParams>::iterator ipit;
-      std::pair<int, int> ms_pair(pen_loc._master_boundary, pen_loc._slave_boundary);
-      ipit = _interaction_params.find(ms_pair);
-
-      if (ipit != _interaction_params.end())
-        frictional_contact_this_interaction = true;
-
-      if (frictional_contact_this_interaction)
-      {
-        std::vector<dof_id_type> & slave_nodes = pen_loc._nearest_node._slave_nodes;
-
-        for (unsigned int i = 0; i < slave_nodes.size(); i++)
-        {
-          dof_id_type slave_node_num = slave_nodes[i];
-
-          if (pen_loc._penetration_info[slave_node_num])
-          {
-            PenetrationInfo & info = *pen_loc._penetration_info[slave_node_num];
-
-            if (info.isCaptured())
-            {
-              // _console << "Slave node: " << slave_node_num << std::endl;
-              const Node * node = info._node;
-
-              VectorValue<dof_id_type> solution_dofs(
-                  node->dof_number(nonlinear_sys.number(), disp_x_var->number(), 0),
-                  node->dof_number(nonlinear_sys.number(), disp_y_var->number(), 0),
-                  (disp_z_var ? node->dof_number(nonlinear_sys.number(), disp_z_var->number(), 0)
-                              : 0));
-
-              // Get old parametric coords from info
-              // get old element from info
-              // Apply current configuration to that element and find xyz coords of that point
-              // find xyz coords of current point from original coords and displacement vector
-              // calculate difference between those two point coordinates to get correction
-
-              // std::vector<Point>points(1);
-              // points[0] = info._starting_closest_point_ref;
-              // Elem *side =
-              // (info._starting_elem->build_side(info._starting_side_num,false)).release();
-              // FEBase &fe = *(pen_loc._fe[0]);
-              // fe.reinit(side, &points);
-              // RealVectorValue correction = starting_point[0] - current_coords;
-              //
-              // RealVectorValue current_coords = *node;
-              // RealVectorValue correction = info._closest_point - current_coords;
-
-              const Node & undisp_node = _mesh.nodeRef(node->id());
-              RealVectorValue solution = info._closest_point - undisp_node;
-
-              for (unsigned int i = 0; i < dim; ++i)
-              {
-                //                  vec_solution.add(solution_dofs(i), correction(i));
-                vec_solution.set(solution_dofs(i), solution(i));
-              }
-              info._distance = 0.0;
-            }
-          }
-        }
-      }
-
-      updatedSolution = true;
-    }
-
-    vec_solution.close();
-
-    _communicator.max(updatedSolution);
-
-    if (updatedSolution)
-    {
-      ghosted_solution = vec_solution;
-      ghosted_solution.close();
-    }
-  }
-
-  return updatedSolution;
-}
 
 bool
 FrictionalAugLagMulContactProblem::calculateSlip(const NumericVector<Number> & ghosted_solution,
@@ -815,113 +635,7 @@ FrictionalAugLagMulContactProblem::calculateInteractionSlip(RealVectorValue & sl
   return state;
 }
 
-void
-FrictionalAugLagMulContactProblem::applySlip(NumericVector<Number> & vec_solution,
-                                    NumericVector<Number> & ghosted_solution,
-                                    std::vector<SlipData> & iterative_slip)
-{
-  NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
-  unsigned int dim = nonlinear_sys.subproblem().mesh().dimension();
-  AuxiliarySystem & aux_sys = getAuxiliarySystem();
-  NumericVector<Number> & aux_solution = aux_sys.solution();
 
-  MooseVariable * disp_x_var = &getVariable(0, _disp_x);
-  MooseVariable * disp_y_var = &getVariable(0, _disp_y);
-  MooseVariable * disp_z_var = nullptr;
-  MooseVariable * inc_slip_x_var = &getVariable(0, _inc_slip_x);
-  MooseVariable * inc_slip_y_var = &getVariable(0, _inc_slip_y);
-  MooseVariable * inc_slip_z_var = nullptr;
-  if (dim == 3)
-  {
-    disp_z_var = &getVariable(0, _disp_z);
-    inc_slip_z_var = &getVariable(0, _inc_slip_z);
-  }
-
-  MooseVariable * disp_var = nullptr;
-  MooseVariable * inc_slip_var = nullptr;
-
-  for (unsigned int iislip = 0; iislip < iterative_slip.size(); ++iislip)
-  {
-    const Node * node = iterative_slip[iislip]._node;
-    const unsigned int dof = iterative_slip[iislip]._dof;
-    const Real slip = iterative_slip[iislip]._slip;
-
-    if (dof == 0)
-    {
-      disp_var = disp_x_var;
-      inc_slip_var = inc_slip_x_var;
-    }
-    else if (dof == 1)
-    {
-      disp_var = disp_y_var;
-      inc_slip_var = inc_slip_y_var;
-    }
-    else
-    {
-      disp_var = disp_z_var;
-      inc_slip_var = inc_slip_z_var;
-    }
-
-    dof_id_type solution_dof = node->dof_number(nonlinear_sys.number(), disp_var->number(), 0),
-                inc_slip_dof = node->dof_number(aux_sys.number(), inc_slip_var->number(), 0);
-
-    vec_solution.add(solution_dof, slip);
-    aux_solution.add(inc_slip_dof, slip);
-  }
-
-  aux_solution.close();
-  vec_solution.close();
-  unsigned int num_slipping_nodes = iterative_slip.size();
-  _communicator.sum(num_slipping_nodes);
-  if (num_slipping_nodes > 0)
-  {
-    ghosted_solution = vec_solution;
-    ghosted_solution.close();
-
-    updateContactPoints(ghosted_solution, false);
-
-    enforceRateConstraint(vec_solution, ghosted_solution);
-  }
-}
-
-unsigned int
-FrictionalAugLagMulContactProblem::numLocalFrictionalConstraints()
-{
-  GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-  std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-      &displaced_geom_search_data._penetration_locators;
-
-  unsigned int num_constraints(0);
-
-  for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end(); ++plit)
-  {
-    PenetrationLocator & pen_loc = *plit->second;
-
-    bool frictional_contact_this_interaction = false;
-
-    std::map<std::pair<int, int>, InteractionParams>::iterator ipit;
-    std::pair<int, int> ms_pair(pen_loc._master_boundary, pen_loc._slave_boundary);
-    ipit = _interaction_params.find(ms_pair);
-    if (ipit != _interaction_params.end())
-      frictional_contact_this_interaction = true;
-
-    if (frictional_contact_this_interaction)
-    {
-      std::vector<dof_id_type> & slave_nodes = pen_loc._nearest_node._slave_nodes;
-
-      for (unsigned int i = 0; i < slave_nodes.size(); i++)
-      {
-        dof_id_type slave_node_num = slave_nodes[i];
-
-        PenetrationInfo * pinfo = pen_loc._penetration_info[slave_node_num];
-        if (pinfo)
-          if (pinfo->isCaptured())
-            ++num_constraints;
-      }
-    }
-  }
-  return num_constraints;
-}
 
 MooseNonlinearConvergenceReason
 FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
@@ -955,10 +669,10 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
                                                           my_div_threshold);
 
   _refResidContact = ref_resid; // use initial residual if no reference variables are specified
+
   updateContactReferenceResidual();
 
-  _console << "I am the next step \n";
-
+  _console << "check whether to run the Augmented LM loop\n";
 
 
   ++_num_nl_its_since_contact_update;
@@ -977,13 +691,10 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
         nonlinear_sys.update();
         const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
 
-        bool _augLM_repeat_step = false;
+      //  bool _augLM_repeat_step = false;
+        _do_lagmul_update = false;
+        _do_slip_update = false;
 
-
-        /*if ( calculatePenetration(*ghosted_solution, nullptr) )
-            _augLM_repeat_step = true;
-            else
-            _augLM_repeat_step = false;*/
 
             if (_displaced_problem != NULL)
                   _augLM_repeat_step = nonlinear_sys.updateLagMul(true);
@@ -991,14 +702,12 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
                   _augLM_repeat_step = nonlinear_sys.updateLagMul(false);
 
 
+        //   calculatePenetartion(*ghost_solution);
+        //   calculateSlip(*ghosted_solution, nullptr);
 
-           calculateSlip(*ghosted_solution, nullptr);
 
-
-      if (_augLM_repeat_step || (_slip_residual > _target_contact_residual &&
-          _slip_residual > _target_relative_contact_residual * _refResidContact))
+      if (_augLM_repeat_step)
       {
-
         reason = MOOSE_NONLINEAR_ITERATING;
 
         _console << "iteration " << _num_iterations << " ";
@@ -1006,15 +715,18 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
        // do a slip update if there is another iteration
         _do_lagmul_update = true;
         _do_slip_update = true;
+        _num_iterations++;
 
+        if (_displaced_problem != NULL)
+              _augLM_repeat_step = nonlinear_sys.updateLagMul(true);
+        else
+              _augLM_repeat_step = nonlinear_sys.updateLagMul(false);
 
-        //_num_lagmul_iterations ++;
+        _num_iterations ++;
 
       // Just to calculate slip residual
 
        // force it to keep iterating
-        //  nonlinear_sys.updateLagMulTauInc();
-          //reason = MOOSE_NONLINEAR_ITERATING;
           _console << "Force slip update slip_resid > target: " << _slip_residual << std::endl;
         }
         else
@@ -1031,94 +743,4 @@ FrictionalAugLagMulContactProblem::checkNonlinearConvergence(std::string & msg,
     }
 
   return reason;
-}
-
-void
-FrictionalAugLagMulContactProblem::updateContactPoints(NumericVector<Number> & ghosted_solution,
-                                              bool update_incremental_slip)
-{
-  GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-  std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-      &displaced_geom_search_data._penetration_locators;
-
-  for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end(); ++plit)
-  {
-    PenetrationLocator & pen_loc = *plit->second;
-    pen_loc.setUpdate(true);
-  }
-
-  // Do new contact search to update positions of slipped nodes
-  _displaced_problem->updateMesh(ghosted_solution, *_aux->currentSolution());
-
-  for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end(); ++plit)
-  {
-    PenetrationLocator & pen_loc = *plit->second;
-    pen_loc.setUpdate(false);
-  }
-  if (update_incremental_slip)
-    updateIncrementalSlip();
-}
-
-void
-FrictionalAugLagMulContactProblem::updateIncrementalSlip()
-{
-  AuxiliarySystem & aux_sys = getAuxiliarySystem();
-  NumericVector<Number> & aux_solution = aux_sys.solution();
-
-  MooseVariable * inc_slip_x_var = &getVariable(0, _inc_slip_x);
-  MooseVariable * inc_slip_y_var = &getVariable(0, _inc_slip_y);
-  MooseVariable * inc_slip_z_var = nullptr;
-
-  unsigned int dim = getNonlinearSystemBase().subproblem().mesh().dimension();
-  if (dim == 3)
-    inc_slip_z_var = &getVariable(0, _inc_slip_z);
-
-  GeometricSearchData & displaced_geom_search_data = getDisplacedProblem()->geomSearchData();
-  std::map<std::pair<unsigned int, unsigned int>, PenetrationLocator *> * penetration_locators =
-      &displaced_geom_search_data._penetration_locators;
-
-  for (PLIterator plit = penetration_locators->begin(); plit != penetration_locators->end(); ++plit)
-  {
-    PenetrationLocator & pen_loc = *plit->second;
-
-    bool frictional_contact_this_interaction = false;
-
-    std::map<std::pair<int, int>, InteractionParams>::iterator ipit;
-    std::pair<int, int> ms_pair(pen_loc._master_boundary, pen_loc._slave_boundary);
-    ipit = _interaction_params.find(ms_pair);
-    if (ipit != _interaction_params.end())
-      frictional_contact_this_interaction = true;
-
-    if (frictional_contact_this_interaction)
-    {
-      std::vector<dof_id_type> & slave_nodes = pen_loc._nearest_node._slave_nodes;
-
-      for (unsigned int i = 0; i < slave_nodes.size(); i++)
-      {
-        dof_id_type slave_node_num = slave_nodes[i];
-
-        if (pen_loc._penetration_info[slave_node_num])
-        {
-          PenetrationInfo & info = *pen_loc._penetration_info[slave_node_num];
-
-          if (info.isCaptured())
-          {
-            const Node * node = info._node;
-            VectorValue<dof_id_type> inc_slip_dofs(
-                node->dof_number(aux_sys.number(), inc_slip_x_var->number(), 0),
-                node->dof_number(aux_sys.number(), inc_slip_y_var->number(), 0),
-                (inc_slip_z_var ? node->dof_number(aux_sys.number(), inc_slip_z_var->number(), 0)
-                                : 0));
-
-            RealVectorValue inc_slip = info._incremental_slip;
-
-            for (unsigned int i = 0; i < dim; ++i)
-              aux_solution.set(inc_slip_dofs(i), inc_slip(i));
-          }
-        }
-      }
-    }
-  }
-
-  aux_solution.close();
 }
