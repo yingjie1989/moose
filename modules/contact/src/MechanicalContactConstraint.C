@@ -124,7 +124,7 @@ MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters &
     _formulation(ContactMaster::contactFormulation(getParam<std::string>("formulation"))),
     _normalize_penalty(getParam<bool>("normalize_penalty")),
     _penalty(getParam<Real>("penalty")),
-    _penalty_slip(getParam<Real>("penalty_slip")),
+    _penalty_slip(1e8),
     _friction_coefficient(getParam<Real>("friction_coefficient")),
     _tension_release(getParam<Real>("tension_release")),
     _capture_tolerance(getParam<Real>("capture_tolerance")),
@@ -203,6 +203,12 @@ MechanicalContactConstraint::MechanicalContactConstraint(const InputParameters &
 
   if (_friction_coefficient < 0)
     mooseError("The friction coefficient must be nonnegative");
+
+ if (parameters.isParamValid("penalty_slip"))
+    _penalty_slip = parameters.get<Real>("penalty_slip");
+    else
+    _penalty_slip = parameters.get<Real>("penalty");
+
 }
 
 void
@@ -231,8 +237,6 @@ MechanicalContactConstraint::jacobianSetup()
 void
 MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 {
-  _console << "Update Augmented Lagrangian Multiplier" << "\n";
-
   for (auto & pinfo_pair : _penetration_locator._penetration_info)
   {
     const dof_id_type slave_node_num = pinfo_pair.first;
@@ -420,9 +424,10 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
 
   if ( contactResidual <  _penetration_tolerance)
   {
-    _console << "contact enforcement satisfied \n";
     return true;
   }
+
+  _console << "penetration enforcement not satisfied \n";
 
    return false;
 

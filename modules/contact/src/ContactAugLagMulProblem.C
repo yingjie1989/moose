@@ -66,9 +66,9 @@ validParams<ContactAugLagMulProblem>()
   params.addParam<Real>("contact_lagmul_tolerance_factor",
                                               "Augmented Lagrangian Multiplier tolerance factor");
 
-  //params.addParam<std::vector<std::string>>(
-  //    "contact_reference_residual_variables",
-  //    "Set of variables that provide reference residuals for relative contact convergence check");
+  params.addParam<std::vector<std::string>>(
+      "contact_reference_residual_variables",
+      "Set of variables that provide reference residuals for relative contact convergence check");
 
 
   return params;
@@ -134,9 +134,9 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
   _max_lagmul_iters = params.get<int>("maximum_update_iterations");
   //_lagmul_updates_per_iter = params.get<int>("lagmul_updates_per_iteration");
 
-  //if (params.isParamValid("contact_reference_residual_variables"))
-  //  _contactRefResidVarNames =
-  //      params.get<std::vector<std::string>>("contact_reference_residual_variables");
+  if (params.isParamValid("contact_reference_residual_variables"))
+    _contactRefResidVarNames =
+        params.get<std::vector<std::string>>("contact_reference_residual_variables");
 }
 
 void
@@ -145,14 +145,32 @@ ContactAugLagMulProblem::initialSetup()
   _console << "the LM Problem initial\n";
 
   ReferenceResidualProblem::initialSetup();
+
+  _contactRefResidVarIndices.clear();
+  for (unsigned int i = 0; i < _contactRefResidVarNames.size(); ++i)
+  {
+    bool foundMatch = false;
+    for (unsigned int j = 0; j < _refResidVarNames.size(); ++j)
+    {
+      if (_contactRefResidVarNames[i] == _refResidVarNames[j])
+      {
+        _contactRefResidVarIndices.push_back(j);
+        foundMatch = true;
+        break;
+      }
+    }
+    if (!foundMatch)
+      mooseError("Could not find variable '",
+                 _contactRefResidVarNames[i],
+                 "' in reference_residual_variables");
+  }
+
+
 }
 
 void
 ContactAugLagMulProblem::timestepSetup()
 {
-
-  _console << "the LM Problem timestepSetup\n";
-
   _do_lagmul_update = false;
   _num_lagmul_iterations = 0;
   _num_nl_its_since_contact_update = 0;
@@ -163,9 +181,6 @@ ContactAugLagMulProblem::timestepSetup()
 void
 ContactAugLagMulProblem::updateContactReferenceResidual()
 {
-
-  _console << "the LM Problem update\n";
-
   if (_contactRefResidVarIndices.size() > 0)
   {
     _refResidContact = 0.0;
@@ -237,7 +252,7 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
 
         NonlinearSystemBase & nonlinear_sys = getNonlinearSystemBase();
         nonlinear_sys.update();
-        const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
+      //  const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
 
         bool _augLM_repeat_step;
 
@@ -249,13 +264,13 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
         if (_augLM_repeat_step)
         { // force it to keep iterating
           reason = MOOSE_NONLINEAR_ITERATING;
-          _console << "Contact constraint is not satisfied \n" << std::endl;
+          _console << "Contact constraint is not satisfied,  Need to update the Lagrangin Multiplier\n" << std::endl;
           _num_lagmul_iterations ++;
         }
         else
         {
           //_do_slip_update = false; //maybe we want to do this
-          _console << "Contact penetration pene_resid < tolerance" << std::endl;
+          _console << "Contact constraint is satisfied" << std::endl;
         }
     }
     else

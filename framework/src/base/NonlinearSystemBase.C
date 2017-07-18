@@ -752,8 +752,6 @@ NonlinearSystemBase::updateLagMul(bool displaced)
 
  	if (!nc->contactConverged())
      	{
-	   _console << "Warning! need to update the Lagrangin Multiplier\n";
-
            nc->updateLagMul(false);
           // restoreSolutions();
    	   return true;
@@ -798,7 +796,7 @@ NonlinearSystemBase::initLagMul(bool displaced)
 
     	for (const auto & nc : ncs)
     	{
-     		if(nc->haveAugLM()){
+     		if (nc->haveAugLM()){
 			 _console << "Initialize the Lagrangin Multiplier\n";
 			nc->updateLagMul(true);
 			return;
@@ -841,7 +839,7 @@ NonlinearSystemBase::haveAugLM(bool displaced)
     const auto & ncs = _constraints.getActiveNodeFaceConstraints(slave_boundary, displaced);
     for (const auto & nc : ncs)
     {
-      if(nc->haveAugLM()){
+      if (nc->haveAugLM()){
 	   _console << "The contact is enforced using augmented Lagrangin Multiplier\n";
 	return true;
     }

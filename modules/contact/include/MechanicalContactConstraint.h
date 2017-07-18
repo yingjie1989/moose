@@ -96,7 +96,7 @@ protected:
   const bool _normalize_penalty;
 
   const Real _penalty;
-  const Real _penalty_slip;
+  Real _penalty_slip;
   const Real _friction_coefficient;
   const Real _tension_release;
   const Real _capture_tolerance;

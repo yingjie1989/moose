@@ -52,9 +52,9 @@ protected:
   NonlinearVariableName _disp_x;
   NonlinearVariableName _disp_y;
   NonlinearVariableName _disp_z;
-  AuxVariableName _residual_x;
-  AuxVariableName _residual_y;
-  AuxVariableName _residual_z;
+  //AuxVariableName _residual_x;
+  //AuxVariableName _residual_y;
+  //AuxVariableName _residual_z;
 
   std::vector<std::string> _contactRefResidVarNames;
   std::vector<unsigned int> _contactRefResidVarIndices;
