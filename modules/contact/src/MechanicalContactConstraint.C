@@ -336,6 +336,8 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
 
   Real contactResidual = 0.0;
 
+  Real converged = 0.0;
+
    for (auto & pinfo_pair : _penetration_locator._penetration_info)
   {
     const dof_id_type slave_node_num = pinfo_pair.first;
@@ -370,6 +372,12 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
 	     if (contactResidual < std::abs(distance) )
                 contactResidual = std::abs(distance);
 
+      if ( contactResidual >  _penetration_tolerance){
+         _console << "penetration enforcement not satisfied \n";
+         converged = 1;
+         break;
+      }
+
 
     if (_model == CM_COULOMB){
 
@@ -401,35 +409,30 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
           if ( tangential_inc_slip_mag > _stickking_tolerance){
             if (tan_mag < capacity){
               _console << "slipped too far \n";
-              return false;
+              converged = 2;
+              break;
             }
           }
 
           if ( tan_mag > (1+_frictionalforce_tolerance) * capacity ){
             _console << "frictional force exceeds frictional limit \n";
-            return false;
+            converged = 3;
+            break;
           }
         }
    }
  }
 
-  _communicator.max(contactResidual);
+  _communicator.max(converged);
 
   //_console << "L inf norm of penetration is %4.3e" << contactResidual <<"\n";
   //_console << "penetration toleracne is  %4.3e" << _penetration_tolerance <<"\n";
- printf("L inf norm of penetration is %4.3e\n",contactResidual);
+ //printf("L inf norm of penetration is %4.3e\n",contactResidual);
  //printf("penetration toleracne is  %4.3e\n",_penetration_tolerance);
+    if (converged > 0.0)
+      return false;
 
-
-
-  if ( contactResidual <  _penetration_tolerance)
-  {
-    return true;
-  }
-
-  _console << "penetration enforcement not satisfied \n";
-
-   return false;
+   return true;
 
 }
 
