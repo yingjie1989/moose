@@ -102,6 +102,9 @@ public:
   Real _frictional_energy_old;
   RealVectorValue _contact_force;
   RealVectorValue _contact_force_old;
+  RealVectorValue _contact_force_normal;
+  RealVectorValue _contact_force_tangential;
+
   Real _lagrange_multiplier;
   RealVectorValue _lagrange_multiplier_slip;
   
