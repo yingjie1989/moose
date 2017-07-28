@@ -305,14 +305,16 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
            // Tangential magnitude of elastic predictor
            const Real tan_mag(contact_force_tangential.norm());
 
-           if (tan_mag > capacity){
+           if (tan_mag > capacity)
              pinfo->_lagrange_multiplier_slip = - tau_old + capacity * contact_force_tangential / tan_mag;
-            }
-             else{
+             else
              pinfo->_lagrange_multiplier_slip += penalty_slip * tangential_inc_slip;
-            }
          }
-       }
+  }
+
+        /* _console << "penalty_slip is  " << _penalty_slip << "\n";
+      	_console << "Augmented Lagrangian Multiplier is " << pinfo->_lagrange_multiplier << "\n";
+        _console << "Augmented Lagrangian Multiplier in slip dir is " << pinfo->_lagrange_multiplier_slip(0) << " " << pinfo->_lagrange_multiplier_slip(1) << "\n";*/
 
    }
 }
@@ -379,13 +381,19 @@ MechanicalContactConstraint::contactConverged() //const NumericVector<Number> & 
 
     if (_model == CM_COULOMB){
 
-          RealVectorValue contact_force_tangential(pinfo->_contact_force_tangential);
-                                          // Magnitude of tangential predictor force
-          const Real tan_mag(contact_force_tangential.norm());
+           RealVectorValue contact_force_normal((pinfo->_contact_force * pinfo->_normal) *
+                                          pinfo->_normal);
+          RealVectorValue contact_force_tangential(pinfo->_contact_force - contact_force_normal);
+
           RealVectorValue tangential_inc_slip = pinfo->_incremental_slip -
                                               (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
 
+                                          // Magnitude of tangential predictor force
+          const Real tan_mag(contact_force_tangential.norm());
           const Real tangential_inc_slip_mag = tangential_inc_slip.norm();
+
+          //const Real capacity(_friction_coefficient * contact_force_normal.norm());
+
 
           RealVectorValue distance_vec = (pinfo->_normal * (_mesh.nodeRef(slave_node_num) - pinfo->_closest_point)) *
                              pinfo->_normal;
@@ -674,7 +682,8 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
 
         case CF_AUGMENTED_LAGRANGE:
         {
-          distance_vec = (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
+          //distance_vec = pinfo->_incremental_slip +
+            distance_vec = (pinfo->_normal * (_mesh.nodeRef(node->id()) - pinfo->_closest_point)) *
                              pinfo->_normal;// + pinfo->_incremental_slip;
 
           pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
@@ -690,23 +699,25 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
           RealVectorValue tangential_inc_slip =
               pinfo->_incremental_slip - (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
 
+          //RealVectorValue tangential_inc_slip = pinfo->_incremental_slip;
+
+
           RealVectorValue inc_pen_force_tangential = pinfo->_lagrange_multiplier_slip + penalty_slip * tangential_inc_slip;
 
           // Elastic predictor
-
-          RealVectorValue tangential_force_old = (pinfo->_contact_force_old -
-             pinfo->_normal * (pinfo->_normal * pinfo->_contact_force_old));
-
-
-          RealVectorValue contact_force_tangential = inc_pen_force_tangential + tangential_force_old;
+          RealVectorValue contact_force_tangential =
+              inc_pen_force_tangential +
+              (pinfo->_contact_force_old -
+               pinfo->_normal * (pinfo->_normal * pinfo->_contact_force_old));
 
           // Tangential magnitude of elastic predictor
           const Real tan_mag(contact_force_tangential.norm());
 
           if (tan_mag > capacity)
           {
-          //  pinfo->_contact_force_tangential = pinfo->_lagrange_multiplier_slip + tangential_force_old;
-            pinfo->_contact_force_tangential = capacity * contact_force_tangential / tan_mag;
+            //contact_force_tangential = pinfo->_lagrange_multiplier_slip + (pinfo->_contact_force_old -
+            //   pinfo->_normal * (pinfo->_normal * pinfo->_contact_force_old));
+
             pinfo->_contact_force =
                 contact_force_normal + capacity * contact_force_tangential / tan_mag;
             if (capacity == 0)
@@ -715,14 +726,11 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
               pinfo->_mech_status = PenetrationInfo::MS_SLIPPING_FRICTION;
           }
           else{
-            pinfo->_contact_force_tangential = contact_force_tangential;
             pinfo->_contact_force = contact_force_normal + contact_force_tangential;
             pinfo->_mech_status = PenetrationInfo::MS_STICKING;
           }
-
           break;
         }
-
 
         case CF_TANGENTIAL_PENALTY:
         {
