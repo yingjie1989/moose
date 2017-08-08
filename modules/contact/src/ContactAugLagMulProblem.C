@@ -79,10 +79,6 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
   : ReferenceResidualProblem(params),
     _penalty(getParam<Real>("penalty")),
     _normalize_penalty(getParam<bool>("normalize_penalty")),
-    //_nodal_area_var(getVar("nodal_area", 0)),
-    //_nodal_area_var(0),
-    //_aux_system(getAuxiliarySystem()),
-    //_aux_solution(_aux_system.currentSolution()),
     _refResidContact(0.0),
     _do_lagmul_update(false),
     _num_lagmul_iterations(0),
@@ -111,10 +107,7 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
   {
     if (!params.isParamValid("disp_z"))
       mooseError("Missing disp_z in FrictionalContactProblem");
-    //if (!params.isParamValid("residual_z"))
-    //  mooseError("Missing residual_z in FrictionalContactProblem");
     _disp_z = params.get<NonlinearVariableName>("disp_z");
-  //  _residual_z = params.get<AuxVariableName>("residual_z");
   }
 
   unsigned int num_interactions = master.size();
@@ -132,7 +125,6 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
 
   _min_lagmul_iters = params.get<int>("minimum_update_iterations");
   _max_lagmul_iters = params.get<int>("maximum_update_iterations");
-  //_lagmul_updates_per_iter = params.get<int>("lagmul_updates_per_iteration");
 
   if (params.isParamValid("contact_reference_residual_variables"))
     _contactRefResidVarNames =
