@@ -89,9 +89,6 @@ ContactAugLagMulProblem::ContactAugLagMulProblem(const InputParameters & params)
 
   _console << "Initialize the LM Problem\n";
 
-//  AuxiliarySystem & aux_sys = getAuxiliarySystem();
-
-
   std::vector<int> master = params.get<std::vector<int>>("master");
   std::vector<int> slave = params.get<std::vector<int>>("slave");
 
@@ -230,6 +227,10 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
   _refResidContact = ref_resid; // use initial residual if no reference variables are specified
   updateContactReferenceResidual();
 
+  _console << "Augmentd Lagrangian Multiplier iteration " << _num_lagmul_iterations << "\n";
+
+  bool _augLM_repeat_step;
+
   ++_num_nl_its_since_contact_update;
 
   if ((reason > 0) ||                         // converged
@@ -239,6 +240,7 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
             fnorm, abstol * _contact_lagmul_tol_factor, rtol * _contact_lagmul_tol_factor, ref_resid))))
   {
     _console << "Augmentd Lagrangian Multiplier iteration " << _num_lagmul_iterations << "\n";
+
     if (_num_lagmul_iterations < _max_lagmul_iters)
     { // do a slip update if there is another iteration
 
@@ -246,7 +248,6 @@ ContactAugLagMulProblem::checkNonlinearConvergence(std::string & msg,
         nonlinear_sys.update();
       //  const NumericVector<Number> *& ghosted_solution = nonlinear_sys.currentSolution();
 
-        bool _augLM_repeat_step;
 
         if (_displaced_problem != NULL)
               _augLM_repeat_step = nonlinear_sys.updateLagMul(true);

@@ -81,6 +81,7 @@ public:
   Elem * _side;
   unsigned int _side_num;
   RealVectorValue _normal;
+  RealVectorValue _normal_old;
   Real _distance; // Positive distance means the node has penetrated
   Real _tangential_distance;
   Point _closest_point;
@@ -96,6 +97,8 @@ public:
   unsigned int _starting_side_num;
   Point _starting_closest_point_ref;
   Point _incremental_slip;
+  Point _total_slip;
+  Point _total_slip_old;
   Real _accumulated_slip;
   Real _accumulated_slip_old;
   Real _frictional_energy;
@@ -107,7 +110,7 @@ public:
 
   Real _lagrange_multiplier;
   RealVectorValue _lagrange_multiplier_slip;
-  
+
   unsigned int _locked_this_step;
   unsigned int _stick_locked_this_step;
   MECH_STATUS_ENUM _mech_status;
