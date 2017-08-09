@@ -239,13 +239,13 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 
 
   for (auto & pinfo_pair : _penetration_locator._penetration_info)
-  {
-    const dof_id_type slave_node_num = pinfo_pair.first;
-    PenetrationInfo * pinfo = pinfo_pair.second;
+ {
+   const dof_id_type slave_node_num = pinfo_pair.first;
+   PenetrationInfo * pinfo = pinfo_pair.second;
 
-    // Skip this pinfo if there are no DOFs on this node.
-    if (!pinfo || pinfo->_node->n_comp(_sys.number(), _vars[_component]) < 1)
-      continue;
+   // Skip this pinfo if there are no DOFs on this node.
+   if (!pinfo || pinfo->_node->n_comp(_sys.number(), _vars[_component]) < 1)
+     continue;
 
        const Real contact_pressure = -(pinfo->_normal * pinfo->_contact_force) / nodalArea(*pinfo);
 
@@ -269,7 +269,7 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
          if (_model == CM_COULOMB){
 
            RealVectorValue distance_vec = (pinfo->_normal * (_mesh.nodeRef(slave_node_num) - pinfo->_closest_point)) *
-                              pinfo->_normal;// + (pinfo->_incremental_slip * pinfo->_normal) * pinfo->_normal;
+                              pinfo->_normal;
 
            Real penalty = getPenalty(*pinfo,_penalty);
            RealVectorValue pen_force = penalty * distance_vec + pinfo->_lagrange_multiplier * pinfo->_normal;
@@ -279,6 +279,7 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
             if (beginning_of_step){
               RealVectorValue _lm_slip_init(0.0,0.0,0.0);
               pinfo->_lagrange_multiplier_slip = _lm_slip_init;
+            //  pinfo->_mech_status = PenetrationInfo::MS_STICKING;
             }else{
            // Frictional capacity
             const Real capacity( _friction_coefficient * (pen_force * pinfo->_normal < 0 ?
@@ -306,8 +307,22 @@ MechanicalContactConstraint::updateLagMul(bool beginning_of_step)
 
            if (tan_mag > capacity)
              pinfo->_lagrange_multiplier_slip = - tau_old + capacity * contact_force_tangential / tan_mag;
-             else
+          else
              pinfo->_lagrange_multiplier_slip += penalty_slip * tangential_inc_slip;
+
+
+            /* if (tan_mag > capacity)
+             {
+               if (capacity == 0)
+                 pinfo->_mech_status = PenetrationInfo::MS_SLIPPING;
+               else
+                 pinfo->_mech_status = PenetrationInfo::MS_SLIPPING_FRICTION;
+             }
+             else{
+                pinfo->_mech_status = PenetrationInfo::MS_STICKING;
+             }
+
+             _console << "lagmul mesh status is " << pinfo->_mech_status <<"\n";*/
 
            }
          }
@@ -504,6 +519,9 @@ MechanicalContactConstraint::shouldApply()
 void
 MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
 {
+
+
+
   const Node * node = pinfo->_node;
 
   // Build up residual vector
@@ -637,6 +655,8 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
           // Tangential magnitude of elastic predictor
           const Real tan_mag(contact_force_tangential.norm());
 
+
+
           if (tan_mag > capacity)
           {
             pinfo->_contact_force =
@@ -685,15 +705,13 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
               pinfo->_contact_force =
                   contact_force_normal + capacity * contact_force_tangential / tan_mag;
 
-          if (pinfo->_mech_status == PenetrationInfo::MS_STICKING)
-              pinfo->_contact_force = contact_force_normal + contact_force_tangential;*/
+          if (pinfo->_mech_status == PenetrationInfo::MS_STICKING){
+              pinfo->_contact_force = contact_force_normal + contact_force_tangential;
+              _console << "computeContactforce mesh status is " << pinfo->_mech_status <<"\n";}*/
 
 
           if (tan_mag > capacity)
           {
-            //contact_force_tangential = pinfo->_lagrange_multiplier_slip + (pinfo->_contact_force_old -
-            //   pinfo->_normal * (pinfo->_normal * pinfo->_contact_force_old));
-
             pinfo->_contact_force =
                 contact_force_normal + capacity * contact_force_tangential / tan_mag;
             if (capacity == 0)
@@ -705,7 +723,6 @@ MechanicalContactConstraint::computeContactForce(PenetrationInfo * pinfo)
             pinfo->_contact_force = contact_force_normal + contact_force_tangential;
             pinfo->_mech_status = PenetrationInfo::MS_STICKING;
           }
-
 
           break;
         }
